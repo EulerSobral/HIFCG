@@ -21,28 +21,8 @@ public class AmbienteRepository  {
 
     public Optional<Ambiente> findByCodigo(String codigo){
 
-        System.out.print("Qual é o código do ambiente? ");
-        String codigo_ambiente = scanner.nextLine();
-
-        System.out.print("Qual é a descrição/nome do ambiente? ");
-        String descricao = scanner.nextLine();
-
-        System.out.print("Qual é o nome do ambiente? ");
-        String nome_ambiente = scanner.nextLine();
-
-        System.out.print("Qual é a capacidade do ambiente? ");
-        int capacidade = Integer.parseInt(scanner.nextLine());
-
-        System.out.print("Qual é o tipo do ambiente? ");
-        String tipo = scanner.nextLine();
-
         String sql = "SELECT * FROM ambiente WHERE codigo = ?";
         List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
-                .codigo(codigo_ambiente)
-                .nome(nome_ambiente)
-                .capacidade(capacidade)
-                .tipo(tipo)
-                .descricao(descricao)
                 .build(), codigo);
         return list.stream().findFirst();
     }
@@ -59,9 +39,7 @@ public class AmbienteRepository  {
    public Optional<Ambiente> findByNomeContainingIgnoreCaseOrCodigoContainingIgnoreCase(String nome, String codigo){
         String sql = "SELECT * FROM ambiente WHERE nome LIKE ? OR codigo = ?";
        List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
-               .codigo("codigo")
-               .nome("nome_ambiente")
-               .build(), codigo);
+               .build(), nome, codigo);
        return list.stream().findFirst();
    };
 }

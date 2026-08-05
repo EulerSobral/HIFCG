@@ -73,34 +73,23 @@ CREATE TABLE turma (
     CONSTRAINT fk_turma_curso FOREIGN KEY (curso_id) REFERENCES curso(id) ON DELETE CASCADE
 );
 
--- 7. Tabela de Períodos Letivos (RF21, RF22, RF23)
-CREATE TABLE periodo (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    codigo VARCHAR(20) NOT NULL UNIQUE, -- Ex: '2026.1'
-    data_inicio DATE NOT NULL,
-    data_fim DATE NOT NULL,
-    ativo BOOLEAN DEFAULT TRUE NOT NULL
-);
 
--- 8. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
+
+-- 7. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
 CREATE TABLE alocacao_horario (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    disciplina_id BIGINT NOT NULL,
-    docente_id BIGINT NOT NULL,
-    ambiente_id BIGINT NOT NULL,
-    turma_id BIGINT NOT NULL,
-    periodo_id BIGINT NOT NULL,
+    disciplina VARCHAR(100) NOT NULL,
+    docente VARCHAR(100) NOT NULL,
+    ambiente VARCHAR(100) NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL,
-    CONSTRAINT fk_alocacao_disciplina FOREIGN KEY (disciplina_id) REFERENCES disciplina(id),
-    CONSTRAINT fk_alocacao_docente FOREIGN KEY (docente_id) REFERENCES docente(id),
-    CONSTRAINT fk_alocacao_ambiente FOREIGN KEY (ambiente_id) REFERENCES ambiente(id),
-    CONSTRAINT fk_alocacao_turma FOREIGN KEY (turma_id) REFERENCES turma(id),
-    CONSTRAINT fk_alocacao_periodo FOREIGN KEY (periodo_id) REFERENCES periodo(id)
+    CONSTRAINT fk_alocacao_disciplina FOREIGN KEY (disciplina) REFERENCES disciplina(codigo),
+    CONSTRAINT fk_alocacao_docente FOREIGN KEY (docente) REFERENCES docente(matricula),
+    CONSTRAINT fk_alocacao_ambiente FOREIGN KEY (ambiente) REFERENCES ambiente(codigo)
 );
 
--- 9. Tabela de Log de Alterações e Auditoria (RF34)
+-- 8. Tabela de Log de Alterações e Auditoria (RF34)
 CREATE TABLE log_sistema (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     usuario_matricula VARCHAR(50) NOT NULL,

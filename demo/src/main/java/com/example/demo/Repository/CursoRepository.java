@@ -23,11 +23,6 @@ public class CursoRepository {
         String sql = "SELECT * FROM cursos WHERE codigo = ?";
 
         List<Curso> list = jdbcTemplate.query(sql, (rs, rowNum) -> Curso.builder()
-                .codigo("codigo")
-                .nome("nome")
-                .turno("turno")
-                .departamento("departamento")
-                .nivel("nivel")
                 .build(), codigo);
         return list.stream().findFirst();
     }
@@ -44,22 +39,12 @@ public class CursoRepository {
     public Optional<Curso> findByDepartamento(String departamento){
         String sql = "SELECT * FROM cursos WHERE departamento = ?";
         List<com.example.demo.Entity.Curso> list = jdbcTemplate.query(sql, (rs, rowNum) -> com.example.demo.Entity.Curso.builder()
-                .codigo("codigo")
-                .nome("nome")
-                .turno("turno")
-                .departamento("departamento")
-                .nivel("nivel")
                 .build(), departamento);
         return list.stream().findFirst();
     }
     public Optional<Curso> findByNomeContainingIgnoreCase(String nome){
         String sql = "SELECT * FROM cursos WHERE LOWER(nome) LIKE LOWER(?) ?";
         List<com.example.demo.Entity.Curso> list = jdbcTemplate.query(sql, (rs, rowNum) -> com.example.demo.Entity.Curso.builder()
-                .codigo("codigo")
-                .nome("nome")
-                .turno("turno")
-                .departamento("departamento")
-                .nivel("nivel")
                 .build(), nome);
         return list.stream().findFirst();
     }

@@ -29,10 +29,6 @@ public class AlocacaoHorario {
     private Ambiente ambiente;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "turma_id", nullable = false)
-    private Turma turma;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "periodo_id", nullable = false)
     private Periodo periodo;
 

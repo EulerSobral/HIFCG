@@ -21,23 +21,19 @@ public class HorarioService {
     private final PeriodoRepository periodoRepository;
 
     @Transactional
-    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo) {
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoPeriodo) {
         Disciplina disciplina = disciplinaRepository.findByCodigo(codigoDisciplina)
                 .orElseThrow(() -> new RuntimeException("Disciplina não encontrada: " + codigoDisciplina));
         Docente docente = docenteRepository.findByMatricula(matriculaDocente)
                 .orElseThrow(() -> new RuntimeException("Docente não encontrado: " + matriculaDocente));
         Ambiente ambiente = ambienteRepository.findByCodigo(codigoAmbiente)
                 .orElseThrow(() -> new RuntimeException("Ambiente não encontrado: " + codigoAmbiente));
-        Turma turma = turmaRepository.findByCodigo(codigoTurma)
-                .orElseThrow(() -> new RuntimeException("Turma não encontrada: " + codigoTurma));
-        Periodo periodo = periodoRepository.findByCodigo(codigoPeriodo)
-                .orElseThrow(() -> new RuntimeException("Período não encontrado: " + codigoPeriodo));
+
 
         AlocacaoHorario alocacao = AlocacaoHorario.builder()
                 .disciplina(disciplina)
                 .docente(docente)
                 .ambiente(ambiente)
-                .turma(turma)
                 .periodo(periodo)
                 .diaSemana("SEG")
                 .horarioInicio(LocalTime.of(8, 0))

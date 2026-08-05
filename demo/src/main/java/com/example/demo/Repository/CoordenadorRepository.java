@@ -63,14 +63,6 @@ public class CoordenadorRepository {
     public Optional<Coordenador> findCoordenadorByMatricula(String matricula) {
         String sql = "SELECT * FROM coordenador WHERE matricula = ?";
         List<Coordenador> list = jdbcTemplate.query(sql, (rs, rowNum) -> Coordenador.builder()
-                .id(rs.getLong("id"))
-                .matricula(rs.getString("matricula"))
-                .nome(rs.getString("nome"))
-                .email(rs.getString("email"))
-                .senha(rs.getString("senha"))
-                .tipoCoordenador(rs.getString("tipo_coordenador"))
-                .departamento(rs.getString("departamento"))
-                .cursoCodigo(rs.getString("curso_codigo"))
                 .build(), matricula);
         return list.stream().findFirst();
     }
