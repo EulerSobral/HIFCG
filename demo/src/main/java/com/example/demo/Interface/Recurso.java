@@ -1,7 +1,7 @@
 package com.example.demo.Interface;
 
 public interface Recurso {
-    void cadastrarRecurso(String codigo, String descricao);
-    void alterarRecurso(String codigo, String descricao);
-    void excluirRecurso(String codigo);
+    void cadastrarRecurso( int  tipo_recurso);
+    void alterarRecurso(int  tipo_recurso);
+    void excluirRecurso(int  tipo_recurso);
 }

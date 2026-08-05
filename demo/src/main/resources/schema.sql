@@ -39,6 +39,7 @@ CREATE TABLE ambiente (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
+    descricao VARCHAR(10000) NOT NULL ,
     capacidade INT NOT NULL,
     tipo VARCHAR(50) NOT NULL -- 'SALA', 'LABORATORIO', 'AUDITORIO', 'QUADRA'
 );
@@ -58,8 +59,6 @@ CREATE TABLE disciplina (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
-    ementa CLOB,
-    especialidade VARCHAR(100),
     carga_horaria INT NOT NULL,
     curso_id BIGINT NOT NULL,
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(id) ON DELETE CASCADE
