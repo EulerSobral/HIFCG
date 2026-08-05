@@ -24,9 +24,9 @@ public class AlocacaoHorarioRepository {
     }
 
 
-    public void alocarHorario(String disciplina, String docente, String ambiente, String dia_semana, Time horario_inicio, Time horario_fim) {
+    public void alocarHorario(String disciplina, String docente, String ambiente, String dia_semana, String turma,Time horario_inicio, Time horario_fim) {
 
-        String sql = "INSERT INTO alocacao_horario (disciplina, docente, ambiente, dia_semana, horario_inicio, horario_fim) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO alocacao_horario (disciplina, docente, ambiente, turma,dia_semana, horario_inicio, horario_fim) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         String sqlDocente = "SELECT matricula FROM docente WHERE nome LIKE docente";
         String matriculaDocente = jdbcTemplate.queryForObject(sqlDocente, String.class, docente);

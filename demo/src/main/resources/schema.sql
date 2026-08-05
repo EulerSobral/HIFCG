@@ -81,6 +81,7 @@ CREATE TABLE alocacao_horario (
     disciplina VARCHAR(100) NOT NULL,
     docente VARCHAR(100) NOT NULL,
     ambiente VARCHAR(100) NOT NULL,
+    turma VARCHAR(100) NOT NULL ,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL,
