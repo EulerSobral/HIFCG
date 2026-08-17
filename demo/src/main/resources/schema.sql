@@ -5,13 +5,11 @@
 
 DROP TABLE IF EXISTS log_sistema;
 DROP TABLE IF EXISTS alocacao_horario;
-DROP TABLE IF EXISTS turma;
 DROP TABLE IF EXISTS disciplina;
 DROP TABLE IF EXISTS curso;
 DROP TABLE IF EXISTS ambiente;
 DROP TABLE IF EXISTS docente;
 DROP TABLE IF EXISTS coordenador;
-DROP TABLE IF EXISTS periodo;
 
 -- 1. Tabela de Coordenadores e Administradores (RF31, RF33, RF38)
 CREATE TABLE coordenador (
@@ -39,7 +37,7 @@ CREATE TABLE ambiente (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
-    descricao VARCHAR(10000) NOT NULL ,
+    descricao VARCHAR(10000) NOT NULL,
     capacidade INT NOT NULL,
     tipo VARCHAR(50) NOT NULL -- 'SALA', 'LABORATORIO', 'AUDITORIO', 'QUADRA'
 );
@@ -60,28 +58,18 @@ CREATE TABLE disciplina (
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     carga_horaria INT NOT NULL,
-    curso_id BIGINT NOT NULL,
-    CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(id) ON DELETE CASCADE
+    curso_id VARCHAR(50) NOT NULL,
+    CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
 
--- 6. Tabela de Turmas
-CREATE TABLE turma (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    codigo VARCHAR(50) NOT NULL UNIQUE,
-    nome VARCHAR(100) NOT NULL,
-    curso_id BIGINT NOT NULL,
-    CONSTRAINT fk_turma_curso FOREIGN KEY (curso_id) REFERENCES curso(id) ON DELETE CASCADE
-);
-
-
-
--- 7. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
+-- 6. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
 CREATE TABLE alocacao_horario (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     disciplina VARCHAR(100) NOT NULL,
     docente VARCHAR(100) NOT NULL,
     ambiente VARCHAR(100) NOT NULL,
-    turma VARCHAR(100) NOT NULL ,
+    turma VARCHAR(100) NOT NULL,
+    periodo VARCHAR(50) NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL,
@@ -90,7 +78,7 @@ CREATE TABLE alocacao_horario (
     CONSTRAINT fk_alocacao_ambiente FOREIGN KEY (ambiente) REFERENCES ambiente(codigo)
 );
 
--- 8. Tabela de Log de Alterações e Auditoria (RF34)
+-- 7. Tabela de Log de Alterações e Auditoria (RF34)
 CREATE TABLE log_sistema (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     usuario_matricula VARCHAR(50) NOT NULL,
@@ -98,3 +86,19 @@ CREATE TABLE log_sistema (
     detalhes CLOB,
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
+
+-- =============================================================================
+-- INSERÇÃO DE DADOS PADRÃO DE TESTES (SEEDS)
+-- =============================================================================
+
+-- Coordenador de Departamento Padrão
+INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
+VALUES ('DEP001', 'Coordenador de Departamento Silva', 'coord.depto@ifpb.edu.br', 'senha123', 'AREA_DEPARTAMENTO', 'Informatica', NULL);
+
+-- Coordenador de Curso Padrão
+INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
+VALUES ('COORD001', 'Coordenador de Curso Souza', 'coord.curso@ifpb.edu.br', 'senha123', 'CURSO', 'Informatica', 'ADS');
+
+-- Curso Padrão
+INSERT INTO curso (codigo, nome, turno, nivel, departamento)
+VALUES ('ADS', 'Análise e Desenvolvimento de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informatica');

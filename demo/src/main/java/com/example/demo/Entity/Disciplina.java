@@ -22,10 +22,17 @@ public class Disciplina {
     private String nome;
 
 
+    @Lob
+    private String ementa;
+
+
+    @Column(length = 100)
+    private String especialidade;
+
     @Column(name = "carga_horaria", nullable = false)
     private Integer cargaHoraria;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+
     @JoinColumn(name = "curso_id", nullable = false)
-    private Curso curso;
+    private String curso;
 }

@@ -49,6 +49,7 @@ public class AlocacaoHorarioRepository {
         jdbcTemplate.update(sql, id);
     }
 
+
     public boolean existeChoqueAmbiente(String codigoAmbiente) {
         String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE fk_alocacao_ambiente = codigoAmbiente";
 
@@ -62,5 +63,7 @@ public class AlocacaoHorarioRepository {
 
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, matriculaDocente);
         return count != null && count > 0;
+    }
+    {
     }
 }

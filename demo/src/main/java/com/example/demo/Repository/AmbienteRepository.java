@@ -6,12 +6,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Scanner;
 
 @Repository
-public class AmbienteRepository  {
-
-    private final Scanner scanner = new Scanner(System.in);
+public class AmbienteRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -19,27 +16,50 @@ public class AmbienteRepository  {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public Optional<Ambiente> findByCodigo(String codigo){
+    public void save(Ambiente ambiente) {
+        String sql = "INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo) VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql,
+                ambiente.getCodigo(),
+                ambiente.getNome(),
+                ambiente.getDescricao(),
+                ambiente.getCapacidade(),
+                ambiente.getTipo());
+    }
 
+    public Optional<Ambiente> findByCodigo(String codigo) {
         String sql = "SELECT * FROM ambiente WHERE codigo = ?";
         List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
+                .id(rs.getLong("id"))
+                .codigo(rs.getString("codigo"))
+                .nome(rs.getString("nome"))
+                .descricao(rs.getString("descricao"))
+                .capacidade(rs.getInt("capacidade"))
+                .tipo(rs.getString("tipo"))
                 .build(), codigo);
         return list.stream().findFirst();
     }
-    public boolean existsByCodigo(String codigo){
-        String sql = "SELECT COUNT(*) FROM ambiente WHERE codigo = ?";
 
+    public boolean existsByCodigo(String codigo) {
+        String sql = "SELECT COUNT(*) FROM ambiente WHERE codigo = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, codigo);
         return count != null && count > 0;
     }
-    public void deleteByCodigo(String codigo){
+
+    public void deleteByCodigo(String codigo) {
         String sql = "DELETE FROM ambiente WHERE codigo = ?";
         jdbcTemplate.update(sql, codigo);
     }
-   public Optional<Ambiente> findByNomeContainingIgnoreCaseOrCodigoContainingIgnoreCase(String nome, String codigo){
-        String sql = "SELECT * FROM ambiente WHERE nome LIKE ? OR codigo = ?";
-       List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
-               .build(), nome, codigo);
-       return list.stream().findFirst();
-   };
+
+    public Optional<Ambiente> findByNomeContainingIgnoreCaseOrCodigoContainingIgnoreCase(String nome, String codigo) {
+        String sql = "SELECT * FROM ambiente WHERE LOWER(nome) LIKE LOWER(?) OR codigo = ?";
+        List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
+                .id(rs.getLong("id"))
+                .codigo(rs.getString("codigo"))
+                .nome(rs.getString("nome"))
+                .descricao(rs.getString("descricao"))
+                .capacidade(rs.getInt("capacidade"))
+                .tipo(rs.getString("tipo"))
+                .build(), "%" + nome + "%", codigo);
+        return list.stream().findFirst();
+    }
 }

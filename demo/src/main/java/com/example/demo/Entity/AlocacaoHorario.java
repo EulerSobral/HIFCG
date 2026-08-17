@@ -28,9 +28,11 @@ public class AlocacaoHorario {
     @JoinColumn(name = "ambiente_id", nullable = false)
     private Ambiente ambiente;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "periodo_id", nullable = false)
-    private Periodo periodo;
+    @Column(nullable = false, length = 100)
+    private String turma;
+
+    @Column(nullable = false, length = 50)
+    private String periodo;
 
     @Column(name = "dia_semana", nullable = false, length = 20)
     private String diaSemana;

@@ -18,9 +18,8 @@ public class CoordenadorRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public  Map<String, String> loginRepository(String email, String password){
-
-        String query = "SELECT * FROM coordenador WHERE email = ? AND password = ?";
+    public Map<String, String> loginRepository(String email, String password) {
+        String query = "SELECT * FROM coordenador WHERE email = ? AND senha = ?";
 
         try {
             Map<String, Object> userLogin = jdbcTemplate.queryForMap(query, email, password);
@@ -28,13 +27,14 @@ public class CoordenadorRepository {
             Map<String, String> result = new HashMap<>();
 
             result.put("email", (String) userLogin.get("email"));
-            result.put("password", (String) userLogin.get("password"));
+            result.put("senha", (String) userLogin.get("senha"));
+            result.put("nome", (String) userLogin.get("nome"));
+            result.put("tipo_coordenador", (String) userLogin.get("tipo_coordenador"));
 
             return result;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Credenciais inválidas ou usuário não encontrado para: " + email);
         }
-
     }
 
     public void save(Coordenador coordenador) {
@@ -63,6 +63,13 @@ public class CoordenadorRepository {
     public Optional<Coordenador> findCoordenadorByMatricula(String matricula) {
         String sql = "SELECT * FROM coordenador WHERE matricula = ?";
         List<Coordenador> list = jdbcTemplate.query(sql, (rs, rowNum) -> Coordenador.builder()
+                .matricula(rs.getString("matricula"))
+                .nome(rs.getString("nome"))
+                .email(rs.getString("email"))
+                .senha(rs.getString("senha"))
+                .tipoCoordenador(rs.getString("tipo_coordenador"))
+                .departamento(rs.getString("departamento"))
+                .cursoCodigo(rs.getString("curso_codigo"))
                 .build(), matricula);
         return list.stream().findFirst();
     }

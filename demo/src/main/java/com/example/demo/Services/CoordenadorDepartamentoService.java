@@ -8,9 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Time;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,14 +23,14 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
     private final DocenteRepository docenteRepository;
     private final DisciplinaRepository disciplinaRepository;
     private final CursoRepository cursoRepository;
-
-    private final Scanner scanner = new Scanner(System.in);
+    private final AlocacaoHorarioRepository alocacaoHorarioRepository;
 
     public Map<String, String> login(String email, String password) throws Exception {
-        try{
+        try {
             return coordenadorRepository.loginRepository(email, password);
+        } catch (Exception e) {
+            throw new Exception("Error");
         }
-        catch(Exception e){throw new Exception("Error");}
     }
 
     @Override
@@ -53,222 +55,171 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
 
     @Override
     @Transactional
-    public void alterarCoordenador(String matricula) {
+    public void alterarCoordenador(String matricula, Map<String, String> dados) {
         coordenadorRepository.findCoordenadorByMatricula(matricula).ifPresentOrElse(coordenador -> {
-            System.out.print("Novo nome do coordenador: ");
-            coordenador.setNome(scanner.nextLine());
-
-            System.out.print("Novo email: ");
-            coordenador.setEmail(scanner.nextLine());
-
-            System.out.print("Novo código do curso: ");
-            coordenador.setCursoCodigo(scanner.nextLine());
-
-            System.out.print("Nova senha: ");
-            coordenador.setSenha(scanner.nextLine());
+            if (dados.containsKey("nome")) coordenador.setNome(dados.get("nome"));
+            if (dados.containsKey("email")) coordenador.setEmail(dados.get("email"));
+            if (dados.containsKey("curso")) coordenador.setCursoCodigo(dados.get("curso"));
+            if (dados.containsKey("password")) coordenador.setSenha(dados.get("password"));
 
             coordenadorRepository.update(coordenador);
-            System.out.println("Coordenador alterado com sucesso!");
-        }, () -> System.out.println("Coordenador não encontrado!"));
+        }, () -> {
+            throw new RuntimeException("Coordenador com matrícula " + matricula + " não encontrado!");
+        });
     }
-
 
     @Override
     @Transactional
-    public void cadastrarRecurso(int tipo_recurso) {
+    public void cadastrarRecurso(int tipo_recurso, Map<String, Object> dados) {
         switch (tipo_recurso) {
-            case 1:
-                System.out.print("Qual é o código do ambiente? ");
-                String codigo = scanner.nextLine();
-
-                System.out.print("Qual é a descrição/nome do ambiente? ");
-                String descricao = scanner.nextLine();
-
-                System.out.print("Qual é o nome do ambiente? ");
-                String nome_ambiente = scanner.nextLine();
-
-                System.out.print("Qual é a capacidade do ambiente? ");
-                int capacidade = Integer.parseInt(scanner.nextLine());
-
-                System.out.print("Qual é o tipo do ambiente? ");
-                String tipo = scanner.nextLine();
-
+            case 1: // Ambiente
                 Ambiente ambiente = Ambiente.builder()
-                        .codigo(codigo)
-                        .nome(nome_ambiente)
-                        .capacidade(capacidade)
-                        .tipo(tipo)
-                        .descricao(descricao)
+                        .codigo(dados.get("codigo") != null ? dados.get("codigo").toString() : null)
+                        .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
+                        .capacidade(dados.get("capacidade") != null ? Integer.parseInt(dados.get("capacidade").toString()) : 0)
+                        .tipo(dados.get("tipo") != null ? dados.get("tipo").toString() : null)
+                        .descricao(dados.get("descricao") != null ? dados.get("descricao").toString() : null)
                         .build();
-
                 ambienteRepository.save(ambiente);
-                System.out.println("Ambiente salvo com sucesso!");
                 break;
 
-            case 2:
-                System.out.print("Qual é a matrícula do docente? ");
-                String matricula = scanner.nextLine();
-
-                System.out.print("Qual é o nome do docente? ");
-                String nome_docente = scanner.nextLine();
-
-                System.out.print("Qual é o email do docente? ");
-                String email = scanner.nextLine();
-
-                System.out.print("Qual é o departamento do docente? ");
-                String departamento = scanner.nextLine();
-
+            case 2: // Docente
                 Docente docente = Docente.builder()
-                        .matricula(matricula)
-                        .email(email)
-                        .nome(nome_docente)
-                        .departamento(departamento)
+                        .matricula(dados.get("matricula") != null ? dados.get("matricula").toString() : null)
+                        .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
+                        .email(dados.get("email") != null ? dados.get("email").toString() : null)
+                        .departamento(dados.get("departamento") != null ? dados.get("departamento").toString() : null)
                         .build();
-
                 docenteRepository.save(docente);
-                System.out.println("Docente salvo com sucesso!");
                 break;
 
-            case 3:
-                System.out.print("Qual é o código da disciplina? ");
-                String codigo_disciplina = scanner.nextLine();
-
-                System.out.print("Qual é o nome da disciplina? ");
-                String nome_disciplina = scanner.nextLine();
-
-                System.out.print("Qual é a carga horária? ");
-                int carga_horaria = Integer.parseInt(scanner.nextLine());
-
-                System.out.print("Qual é o curso? ");
-                String curso = scanner.nextLine();
-
-                List<Curso> cursos = cursoRepository.findByNomeContainingIgnoreCase(curso);
-                Curso cursoEncontrado = cursos.isEmpty() ? null : cursos.get(0);
+            case 3: // Disciplina
+                String cursoNome = dados.get("curso") != null ? dados.get("curso").toString() : "";
+                Optional<Curso> cursos = cursoRepository.findByCodigo(cursoNome);
+                Curso cursoEncontrado = cursos.isEmpty() ? null : cursos.get();
 
                 Disciplina disciplina = Disciplina.builder()
-                        .codigo(codigo_disciplina)
-                        .nome(nome_disciplina)
-                        .cargaHoraria(carga_horaria)
-                        .curso(cursoEncontrado)
+                        .codigo(dados.get("codigo") != null ? dados.get("codigo").toString() : null)
+                        .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
+                        .cargaHoraria(dados.get("cargaHoraria") != null ? Integer.parseInt(dados.get("cargaHoraria").toString()) : 0)
+                        .curso(cursoEncontrado.getCodigo())
                         .build();
-
                 disciplinaRepository.save(disciplina);
-                System.out.println("Disciplina salva com sucesso!");
                 break;
 
             default:
-                System.out.println("Tipo de recurso inválido!");
-                break;
+                throw new IllegalArgumentException("Tipo de recurso inválido: " + tipo_recurso);
         }
     }
 
     @Override
     @Transactional
-    public void alterarRecurso(int tipo_recurso) {
+    public void alterarRecurso(int tipo_recurso, Map<String, Object> dados) {
+        String codigo = dados.get("codigo") != null ? dados.get("codigo").toString() : 
+                       (dados.get("matricula") != null ? dados.get("matricula").toString() : "");
+
         switch (tipo_recurso) {
-            case 1:
-                System.out.print("Qual é o código do ambiente a ser alterado? ");
-                String codigoAmbiente = scanner.nextLine();
-
-                ambienteRepository.findByCodigo(codigoAmbiente).ifPresentOrElse(ambiente -> {
-                    System.out.print("Novo nome do ambiente: ");
-                    ambiente.setNome(scanner.nextLine());
-
-                    System.out.print("Nova descrição: ");
-                    ambiente.setDescricao(scanner.nextLine());
-
-                    System.out.print("Nova capacidade: ");
-                    ambiente.setCapacidade(Integer.parseInt(scanner.nextLine()));
-
-                    System.out.print("Novo tipo: ");
-                    ambiente.setTipo(scanner.nextLine());
-
+            case 1: // Ambiente
+                ambienteRepository.findByCodigo(codigo).ifPresentOrElse(ambiente -> {
+                    if (dados.containsKey("nome")) ambiente.setNome(dados.get("nome").toString());
+                    if (dados.containsKey("descricao")) ambiente.setDescricao(dados.get("descricao").toString());
+                    if (dados.containsKey("capacidade")) ambiente.setCapacidade(Integer.parseInt(dados.get("capacidade").toString()));
+                    if (dados.containsKey("tipo")) ambiente.setTipo(dados.get("tipo").toString());
                     ambienteRepository.save(ambiente);
-                    System.out.println("Ambiente alterado com sucesso!");
-                }, () -> System.out.println("Ambiente não encontrado!"));
+                }, () -> { throw new RuntimeException("Ambiente não encontrado: " + codigo); });
                 break;
 
-            case 2:
-                System.out.print("Qual é a matrícula do docente a ser alterado? ");
-                String matriculaDocente = scanner.nextLine();
-
-                docenteRepository.findByMatricula(matriculaDocente).ifPresentOrElse(docente -> {
-                    System.out.print("Novo nome: ");
-                    docente.setNome(scanner.nextLine());
-
-                    System.out.print("Novo email: ");
-                    docente.setEmail(scanner.nextLine());
-
-                    System.out.print("Novo departamento: ");
-                    docente.setDepartamento(scanner.nextLine());
-
+            case 2: // Docente
+                docenteRepository.findByMatricula(codigo).ifPresentOrElse(docente -> {
+                    if (dados.containsKey("nome")) docente.setNome(dados.get("nome").toString());
+                    if (dados.containsKey("email")) docente.setEmail(dados.get("email").toString());
+                    if (dados.containsKey("departamento")) docente.setDepartamento(dados.get("departamento").toString());
                     docenteRepository.save(docente);
-                    System.out.println("Docente alterado com sucesso!");
-                }, () -> System.out.println("Docente não encontrado!"));
+                }, () -> { throw new RuntimeException("Docente não encontrado: " + codigo); });
                 break;
 
-            case 3:
-                System.out.print("Qual é o código da disciplina a ser alterada? ");
-                String codigoDisciplina = scanner.nextLine();
-
-                disciplinaRepository.findByCodigo(codigoDisciplina).ifPresentOrElse(disciplina -> {
-                    System.out.print("Novo nome: ");
-                    disciplina.setNome(scanner.nextLine());
-
-                    System.out.print("Nova carga horária: ");
-                    disciplina.setCargaHoraria(Integer.parseInt(scanner.nextLine()));
-
+            case 3: // Disciplina
+                disciplinaRepository.findByCodigo(codigo).ifPresentOrElse(disciplina -> {
+                    if (dados.containsKey("nome")) disciplina.setNome(dados.get("nome").toString());
+                    if (dados.containsKey("cargaHoraria")) disciplina.setCargaHoraria(Integer.parseInt(dados.get("cargaHoraria").toString()));
                     disciplinaRepository.save(disciplina);
-                    System.out.println("Disciplina alterada com sucesso!");
-                }, () -> System.out.println("Disciplina não encontrada!"));
+                }, () -> { throw new RuntimeException("Disciplina não encontrada: " + codigo); });
                 break;
 
             default:
-                System.out.println("Tipo de recurso inválido!");
-                break;
+                throw new IllegalArgumentException("Tipo de recurso inválido: " + tipo_recurso);
         }
+    }
+
+    public void cadastrarCurso(String codigo, String nome, String turno, String nivel, String departamento) {
+        Curso curso = Curso.builder()
+                .codigo(codigo)
+                .nome(nome)
+                .turno(turno)
+                .nivel(nivel)
+                .departamento(departamento != null && !departamento.isEmpty() ? departamento : "Informatica")
+                .build();
+
+        cursoRepository.save(curso);
+    }
+
+    public void cadastrarCurso(String codigo, String nome, String turno, String nivel) {
+        cadastrarCurso(codigo, nome, turno, nivel, "Informatica");
     }
 
     @Override
     @Transactional
-    public void excluirRecurso(int tipo_recurso) {
+    public void excluirRecurso(int tipo_recurso, String identificador) {
         switch (tipo_recurso) {
             case 1:
-                System.out.print("Qual é o código do ambiente a ser excluído? ");
-                String codigoAmbiente = scanner.nextLine();
-                if (ambienteRepository.existsByCodigo(codigoAmbiente)) {
-                    ambienteRepository.deleteByCodigo(codigoAmbiente);
-                    System.out.println("Ambiente excluído com sucesso!");
+                if (ambienteRepository.existsByCodigo(identificador)) {
+                    ambienteRepository.deleteByCodigo(identificador);
                 } else {
-                    System.out.println("Ambiente não encontrado!");
+                    throw new RuntimeException("Ambiente não encontrado: " + identificador);
                 }
                 break;
 
             case 2:
-                System.out.print("Qual é a matrícula do docente a ser excluído? ");
-                String matriculaDocente = scanner.nextLine();
-                if (docenteRepository.existsByMatricula(matriculaDocente)) {
-                    docenteRepository.deleteByMatricula(matriculaDocente);
-                    System.out.println("Docente excluído com sucesso!");
+                if (docenteRepository.existsByMatricula(identificador)) {
+                    docenteRepository.deleteByMatricula(identificador);
                 } else {
-                    System.out.println("Docente não encontrado!");
+                    throw new RuntimeException("Docente não encontrado: " + identificador);
                 }
                 break;
 
             case 3:
-                System.out.print("Qual é o código da disciplina a ser excluída? ");
-                String codigoDisciplina = scanner.nextLine();
-                if (disciplinaRepository.existsByCodigo(codigoDisciplina)) {
-                    disciplinaRepository.deleteByCodigo(codigoDisciplina);
-                    System.out.println("Disciplina excluída com sucesso!");
+                if (disciplinaRepository.existsByCodigo(identificador)) {
+                    disciplinaRepository.deleteByCodigo(identificador);
                 } else {
-                    System.out.println("Disciplina não encontrada!");
+                    throw new RuntimeException("Disciplina não encontrada: " + identificador);
                 }
                 break;
 
             default:
-                System.out.println("Tipo de recurso inválido!");
-                break;
+                throw new IllegalArgumentException("Tipo de recurso inválido: " + tipo_recurso);
         }
+    }
+
+    @Transactional
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, Time horario_inicio, Time horario_fim) {
+        Disciplina disciplina = disciplinaRepository.findByCodigo(codigoDisciplina)
+                .orElseThrow(() -> new RuntimeException("Disciplina não encontrada: " + codigoDisciplina));
+        Docente docente = docenteRepository.findByMatricula(matriculaDocente)
+                .orElseThrow(() -> new RuntimeException("Docente não encontrado: " + matriculaDocente));
+        Ambiente ambiente = ambienteRepository.findByCodigo(codigoAmbiente)
+                .orElseThrow(() -> new RuntimeException("Ambiente não encontrado: " + codigoAmbiente));
+
+        AlocacaoHorario alocacao = AlocacaoHorario.builder()
+                .disciplina(disciplina)
+                .docente(docente)
+                .ambiente(ambiente)
+                .turma(codigoTurma)
+                .periodo(codigoPeriodo)
+                .diaSemana("SEG")
+                .horarioInicio(LocalTime.of(8, 0))
+                .horarioFim(LocalTime.of(10, 0))
+                .build();
+
+        alocacaoHorarioRepository.alocarHorario(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, horario_inicio, horario_fim);
     }
 }
