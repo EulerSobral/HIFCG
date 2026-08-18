@@ -47,6 +47,27 @@ public class CoordenadorDepartamentoController {
         }
     }
 
+    @PutMapping("/curso")
+    public ResponseEntity<?> updateCurso(@RequestBody Map<String, Object> credentials) {
+        try {
+            coordenadorDepartamentoService.alterarCurso(credentials);
+            return ResponseEntity.ok("Curso alterado com sucesso");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @DeleteMapping("/curso")
+    public ResponseEntity<?> deleteCurso(@RequestBody Map<String, Object> credentials) {
+        try {
+            String codigo = credentials.get("codigo").toString();
+            coordenadorDepartamentoService.deletarCurso(codigo);
+            return ResponseEntity.ok("Curso deletado com sucesso");
+        }catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
     @PostMapping("/coordenadores")
     public ResponseEntity<?> cadastrarCoordenador(
             @RequestBody Map<String, String> map, 
@@ -148,4 +169,5 @@ public class CoordenadorDepartamentoController {
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
+
 }

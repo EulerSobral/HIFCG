@@ -16,14 +16,28 @@ public class CursoRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void save(Curso curso) {
-        String sql = "INSERT INTO curso (codigo, nome, turno, nivel, departamento) VALUES (?, ?, ?, ?, ?)";
+    public void update(Curso curso) {
+        String sql = "UPDATE curso SET nome = ?, turno = ?, nivel = ?, departamento = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
-                curso.getCodigo(),
                 curso.getNome(),
                 curso.getTurno(),
                 curso.getNivel(),
-                curso.getDepartamento());
+                curso.getDepartamento(),
+                curso.getCodigo());
+    }
+
+    public void save(Curso curso) {
+        if (existsByCodigo(curso.getCodigo())) {
+            update(curso);
+        } else {
+            String sql = "INSERT INTO curso (codigo, nome, turno, nivel, departamento) VALUES (?, ?, ?, ?, ?)";
+            jdbcTemplate.update(sql,
+                    curso.getCodigo(),
+                    curso.getNome(),
+                    curso.getTurno(),
+                    curso.getNivel(),
+                    curso.getDepartamento());
+        }
     }
 
     public Optional<Curso> findByCodigo(String codigo) {

@@ -163,8 +163,27 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
         cursoRepository.save(curso);
     }
 
-    public void cadastrarCurso(String codigo, String nome, String turno, String nivel) {
-        cadastrarCurso(codigo, nome, turno, nivel, "Informatica");
+    public void alterarCurso(Map<String, Object> dados) {
+
+        String codigo = (dados.get("codigo") != null ? dados.get("codigo").toString() : "");
+        String nome = dados.get("nome").toString();
+        String turno = dados.get("turno").toString();
+        String nivel = dados.get("nivel").toString();
+        String departamento = dados.get("departamento").toString();
+
+        Curso  curso = Curso.builder()
+                .codigo(codigo)
+                .nome(nome)
+                .turno(turno)
+                .nivel(nivel)
+                .departamento(departamento)
+                .build();
+        cursoRepository.update(curso);
+    }
+
+
+    public void deletarCurso(String codigo) {
+        cursoRepository.deleteByCodigo(codigo);
     }
 
     @Override

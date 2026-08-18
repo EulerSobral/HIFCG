@@ -16,14 +16,28 @@ public class AmbienteRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void save(Ambiente ambiente) {
-        String sql = "INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo) VALUES (?, ?, ?, ?, ?)";
+    public void update(Ambiente ambiente) {
+        String sql = "UPDATE ambiente SET nome = ?, descricao = ?, capacidade = ?, tipo = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
-                ambiente.getCodigo(),
                 ambiente.getNome(),
                 ambiente.getDescricao(),
                 ambiente.getCapacidade(),
-                ambiente.getTipo());
+                ambiente.getTipo(),
+                ambiente.getCodigo());
+    }
+
+    public void save(Ambiente ambiente) {
+        if (existsByCodigo(ambiente.getCodigo())) {
+            update(ambiente);
+        } else {
+            String sql = "INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo) VALUES (?, ?, ?, ?, ?)";
+            jdbcTemplate.update(sql,
+                    ambiente.getCodigo(),
+                    ambiente.getNome(),
+                    ambiente.getDescricao(),
+                    ambiente.getCapacidade(),
+                    ambiente.getTipo());
+        }
     }
 
     public Optional<Ambiente> findByCodigo(String codigo) {

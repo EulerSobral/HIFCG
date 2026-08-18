@@ -16,13 +16,26 @@ public class DocenteRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void save(Docente docente) {
-        String sql = "INSERT INTO docente (matricula, nome, email, departamento) VALUES (?, ?, ?, ?)";
+    public void update(Docente docente) {
+        String sql = "UPDATE docente SET nome = ?, email = ?, departamento = ? WHERE matricula = ?";
         jdbcTemplate.update(sql,
-                docente.getMatricula(),
                 docente.getNome(),
                 docente.getEmail(),
-                docente.getDepartamento());
+                docente.getDepartamento(),
+                docente.getMatricula());
+    }
+
+    public void save(Docente docente) {
+        if (existsByMatricula(docente.getMatricula())) {
+            update(docente);
+        } else {
+            String sql = "INSERT INTO docente (matricula, nome, email, departamento) VALUES (?, ?, ?, ?)";
+            jdbcTemplate.update(sql,
+                    docente.getMatricula(),
+                    docente.getNome(),
+                    docente.getEmail(),
+                    docente.getDepartamento());
+        }
     }
 
     public Optional<Docente> findByMatricula(String matricula) {

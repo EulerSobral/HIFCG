@@ -16,13 +16,25 @@ public class DisciplinaRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void save(Disciplina disciplina) {
-        String sql = "INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id) VALUES (?, ?, ?, ?)";
+    public void update(Disciplina disciplina) {
+        String sql = "UPDATE disciplina SET nome = ?, carga_horaria = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
-                disciplina.getCodigo(),
                 disciplina.getNome(),
                 disciplina.getCargaHoraria(),
-                disciplina.getCurso());
+                disciplina.getCodigo());
+    }
+
+    public void save(Disciplina disciplina) {
+        if (existsByCodigo(disciplina.getCodigo())) {
+            update(disciplina);
+        } else {
+            String sql = "INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id) VALUES (?, ?, ?, ?)";
+            jdbcTemplate.update(sql,
+                    disciplina.getCodigo(),
+                    disciplina.getNome(),
+                    disciplina.getCargaHoraria(),
+                    disciplina.getCurso());
+        }
     }
 
     public Optional<Disciplina> findByCodigo(String codigo) {
