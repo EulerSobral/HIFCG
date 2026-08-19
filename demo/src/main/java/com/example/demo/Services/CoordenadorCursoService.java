@@ -27,7 +27,7 @@ public class CoordenadorCursoService implements Recurso {
         try {
             return coordenadorRepository.loginRepository(email, password);
         } catch (Exception e) {
-            throw new Exception("Error");
+            throw new Exception("Error: Credenciais invalidos" + e.getMessage());
         }
     }
 

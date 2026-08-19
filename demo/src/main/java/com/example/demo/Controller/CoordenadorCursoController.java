@@ -1,6 +1,7 @@
 package com.example.demo.Controller;
 
 import com.example.demo.Services.CoordenadorCursoService;
+import com.example.demo.Services.TokenService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +13,13 @@ import java.util.Map;
 public class CoordenadorCursoController {
 
     private final CoordenadorCursoService coordenadorCursoService;
+    private final TokenService tokenService;
 
-    public CoordenadorCursoController(CoordenadorCursoService service) {
+    public CoordenadorCursoController(CoordenadorCursoService service, TokenService tokenService) {
         this.coordenadorCursoService = service;
+        this.tokenService = tokenService;
     }
+
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
@@ -24,7 +28,8 @@ public class CoordenadorCursoController {
                     credentials.get("email"), 
                     credentials.get("password")
             );
-            result.put("token", credentials.get("token"));
+            String token = tokenService.generateToken(credentials.get("email"), credentials.get("password"));
+            result.put("token",  token);
             return ResponseEntity.ok(result);
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
@@ -35,7 +40,7 @@ public class CoordenadorCursoController {
     public ResponseEntity<?> cadastrarRecurso(
             @PathVariable int tipoRecurso,
             @RequestBody Map<String, Object> dados,
-            @RequestHeader(value = "Authorization", required = false) String token) {
+            @RequestHeader(value = "Authorization") String token) {
         try {
             coordenadorCursoService.cadastrarRecurso(tipoRecurso, dados);
             return ResponseEntity.ok("Recurso cadastrado com sucesso pelo Coordenador de Curso!");
@@ -48,7 +53,7 @@ public class CoordenadorCursoController {
     public ResponseEntity<?> alterarRecurso(
             @PathVariable int tipoRecurso,
             @RequestBody Map<String, Object> dados,
-            @RequestHeader(value = "Authorization", required = false) String token) {
+            @RequestHeader(value = "Authorization") String token) {
         try {
             coordenadorCursoService.alterarRecurso(tipoRecurso, dados);
             return ResponseEntity.ok("Recurso alterado com sucesso pelo Coordenador de Curso!");
@@ -61,7 +66,7 @@ public class CoordenadorCursoController {
     public ResponseEntity<?> excluirRecurso(
             @PathVariable int tipoRecurso,
             @PathVariable String identificador,
-            @RequestHeader(value = "Authorization", required = false) String token) {
+            @RequestHeader(value = "Authorization") String token) {
         try {
             coordenadorCursoService.excluirRecurso(tipoRecurso, identificador);
             return ResponseEntity.ok("Recurso excluído com sucesso pelo Coordenador de Curso!");
@@ -73,7 +78,7 @@ public class CoordenadorCursoController {
     @PostMapping("alocarRecurso")
     public ResponseEntity<?> alocarRecurso(
             @RequestBody Map<String, String> map,
-            @RequestHeader(value = "Authorization", required = false) String token) {
+            @RequestHeader(value = "Authorization") String token) {
         try {
             String disciplina = map.get("codigoDisciplina");
             String matricula = map.get("codigoMatricula");
