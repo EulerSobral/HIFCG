@@ -102,3 +102,15 @@ VALUES ('COORD001', 'Coordenador de Curso Souza', 'coord.curso@ifpb.edu.br', 'se
 -- Curso Padrão
 INSERT INTO curso (codigo, nome, turno, nivel, departamento)
 VALUES ('ADS', 'Análise e Desenvolvimento de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informatica');
+
+-- Docente Padrão
+INSERT INTO docente (matricula, nome, email, departamento)
+VALUES ('DOC001', 'Professor Carlos', 'carlos@ifpb.edu.br', 'Informatica');
+
+-- Ambiente Padrão
+INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
+VALUES ('LAB1', 'Laboratório 1', 'Laboratório de Informática', 30, 'LABORATORIO');
+
+-- Disciplina Padrão
+INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
+VALUES ('DISC101', 'Estrutura de Dados', 60, 'ADS');

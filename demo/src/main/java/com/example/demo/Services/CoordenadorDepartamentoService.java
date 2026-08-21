@@ -9,10 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Time;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +30,11 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
             throw new Exception("Error");
         }
     }
+
+    public void updateConta(String email, String password) {
+        coordenadorRepository.updateSenhaByEmail(email, password);
+    }
+
 
     @Override
     @Transactional
@@ -95,14 +98,14 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
 
             case 3: // Disciplina
                 String cursoNome = dados.get("curso") != null ? dados.get("curso").toString() : "";
-                Optional<Curso> cursos = cursoRepository.findByCodigo(cursoNome);
-                Curso cursoEncontrado = cursos.isEmpty() ? null : cursos.get();
+                List<Curso> cursos = cursoRepository.findByNomeContainingIgnoreCase(cursoNome);
+                Curso cursoEncontrado = cursos.isEmpty() ? null : cursos.get(0);
 
                 Disciplina disciplina = Disciplina.builder()
                         .codigo(dados.get("codigo") != null ? dados.get("codigo").toString() : null)
                         .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
                         .cargaHoraria(dados.get("cargaHoraria") != null ? Integer.parseInt(dados.get("cargaHoraria").toString()) : 0)
-                        .curso(cursoEncontrado.getCodigo())
+                        .curso(cursoEncontrado != null ? cursoEncontrado.getCodigo() : cursoNome)
                         .build();
                 disciplinaRepository.save(disciplina);
                 break;
@@ -163,27 +166,8 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
         cursoRepository.save(curso);
     }
 
-    public void alterarCurso(Map<String, Object> dados) {
-
-        String codigo = (dados.get("codigo") != null ? dados.get("codigo").toString() : "");
-        String nome = dados.get("nome").toString();
-        String turno = dados.get("turno").toString();
-        String nivel = dados.get("nivel").toString();
-        String departamento = dados.get("departamento").toString();
-
-        Curso  curso = Curso.builder()
-                .codigo(codigo)
-                .nome(nome)
-                .turno(turno)
-                .nivel(nivel)
-                .departamento(departamento)
-                .build();
-        cursoRepository.update(curso);
-    }
-
-
-    public void deletarCurso(String codigo) {
-        cursoRepository.deleteByCodigo(codigo);
+    public void cadastrarCurso(String codigo, String nome, String turno, String nivel) {
+        cadastrarCurso(codigo, nome, turno, nivel, "Informatica");
     }
 
     @Override
@@ -221,24 +205,52 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
 
     @Transactional
     public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, Time horario_inicio, Time horario_fim) {
-        Disciplina disciplina = disciplinaRepository.findByCodigo(codigoDisciplina)
-                .orElseThrow(() -> new RuntimeException("Disciplina não encontrada: " + codigoDisciplina));
-        Docente docente = docenteRepository.findByMatricula(matriculaDocente)
-                .orElseThrow(() -> new RuntimeException("Docente não encontrado: " + matriculaDocente));
-        Ambiente ambiente = ambienteRepository.findByCodigo(codigoAmbiente)
-                .orElseThrow(() -> new RuntimeException("Ambiente não encontrado: " + codigoAmbiente));
+        alocarRecurso(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, "SEG", horario_inicio, horario_fim);
+    }
 
-        AlocacaoHorario alocacao = AlocacaoHorario.builder()
-                .disciplina(disciplina)
-                .docente(docente)
-                .ambiente(ambiente)
-                .turma(codigoTurma)
-                .periodo(codigoPeriodo)
-                .diaSemana("SEG")
-                .horarioInicio(LocalTime.of(8, 0))
-                .horarioFim(LocalTime.of(10, 0))
-                .build();
+    @Transactional
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, String diaSemana, Time horario_inicio, Time horario_fim) {
+        if (!disciplinaRepository.existsByCodigo(codigoDisciplina)) {
+            throw new RuntimeException("Disciplina não encontrada: " + codigoDisciplina);
+        }
+        if (!docenteRepository.existsByMatricula(matriculaDocente)) {
+            throw new RuntimeException("Docente não encontrado com a matrícula: " + matriculaDocente);
+        }
+        if (!ambienteRepository.existsByCodigo(codigoAmbiente)) {
+            throw new RuntimeException("Ambiente não encontrado com o código: " + codigoAmbiente);
+        }
 
-        alocacaoHorarioRepository.alocarHorario(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, horario_inicio, horario_fim);
+        alocacaoHorarioRepository.alocarHorario(
+                codigoDisciplina,
+                matriculaDocente,
+                codigoAmbiente,
+                codigoTurma,
+                codigoPeriodo,
+                diaSemana != null && !diaSemana.isEmpty() ? diaSemana : "SEG",
+                horario_inicio,
+                horario_fim
+        );
+    }
+
+    public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        alocacaoHorarioRepository.removerAlocacoes(disciplina,
+                docente,
+                ambiente,
+                turma,
+                periodo,
+                diaSemana,
+                horarioInicio,
+                horarioFim);
+    }
+
+    public void alterarAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        alocacaoHorarioRepository.alterarAlocacao(disciplina,
+                docente,
+                ambiente,
+                turma,
+                periodo,
+                diaSemana,
+                horarioInicio,
+                horarioFim);
     }
 }

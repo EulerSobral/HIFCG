@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 
-
 @Repository
 public class CoordenadorRepository {
     private final JdbcTemplate jdbcTemplate;
@@ -58,6 +57,11 @@ public class CoordenadorRepository {
                 coordenador.getDepartamento(),
                 coordenador.getCursoCodigo(),
                 coordenador.getMatricula());
+    }
+
+    public void updateSenhaByEmail(String email, String senha) {
+        String sql = "UPDATE coordenador SET senha = ? WHERE email = ?";
+        jdbcTemplate.update(sql, senha, email);
     }
 
     public Optional<Coordenador> findCoordenadorByMatricula(String matricula) {

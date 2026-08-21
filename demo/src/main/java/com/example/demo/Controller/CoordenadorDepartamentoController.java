@@ -35,9 +35,18 @@ public class CoordenadorDepartamentoController {
         }
     }
 
+    @PutMapping("/alterarConta")
+    public ResponseEntity<?> alterarConta(@RequestBody Map<String, String> credentials) {
+        try {
+            coordenadorDepartamentoService.updateConta(credentials.get("email"), credentials.get("password"));
+            return ResponseEntity.ok("Conta alterado com sucesso");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
     @PostMapping("/curso")
-    public ResponseEntity<?> curso(@RequestBody Map<String, String> credentials,
-                                   @RequestHeader(value = "Authorization") String token) {
+    public ResponseEntity<?> curso(@RequestBody Map<String, String> credentials) {
         try {
             String codigo = credentials.get("codigo");
             String nome = credentials.get("nome");
@@ -48,29 +57,6 @@ public class CoordenadorDepartamentoController {
             coordenadorDepartamentoService.cadastrarCurso(codigo, nome, turno, nivel, departamento);
             return ResponseEntity.ok("Curso cadastrado com sucesso");
         } catch (Exception ex) {
-            return ResponseEntity.badRequest().body(ex.getMessage());
-        }
-    }
-
-    @PutMapping("/curso")
-    public ResponseEntity<?> updateCurso(@RequestBody Map<String, Object> credentials,
-                                         @RequestHeader(value = "Authorization") String token) {
-        try {
-            coordenadorDepartamentoService.alterarCurso(credentials);
-            return ResponseEntity.ok("Curso alterado com sucesso");
-        } catch (Exception ex) {
-            return ResponseEntity.badRequest().body(ex.getMessage());
-        }
-    }
-
-    @DeleteMapping("/curso")
-    public ResponseEntity<?> deleteCurso(@RequestBody Map<String, Object> credentials,
-                                         @RequestHeader(value = "Authorization") String token) {
-        try {
-            String codigo = credentials.get("codigo").toString();
-            coordenadorDepartamentoService.deletarCurso(codigo);
-            return ResponseEntity.ok("Curso deletado com sucesso");
-        }catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
@@ -157,7 +143,7 @@ public class CoordenadorDepartamentoController {
         }
     }
 
-    @PostMapping("alocarRecurso")
+    @PostMapping("/alocarRecurso")
     public ResponseEntity<?> alocarRecurso(
             @RequestBody Map<String, String> map,
             @RequestHeader(value = "Authorization") String token) {
@@ -167,14 +153,56 @@ public class CoordenadorDepartamentoController {
             String ambiente = map.get("codigoAmbiente");
             String turma = map.get("codigoTurma");
             String periodo = map.get("codigoPeriodo");
+            String diaSemana = map.getOrDefault("diaSemana", "SEG");
             Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
             Time horario_fim = Time.valueOf(map.get("horarioFim"));
 
-            coordenadorDepartamentoService.alocarRecurso(disciplina, matricula, ambiente, turma, periodo, horario_inicio, horario_fim);
-            return ResponseEntity.ok("Recursos alocodaos no horário");
+            coordenadorDepartamentoService.alocarRecurso(disciplina, matricula, ambiente, turma, periodo, diaSemana, horario_inicio, horario_fim);
+            return ResponseEntity.ok("Recursos alocados com sucesso no horário!");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
 
+    @DeleteMapping("/removerHorario")
+    public ResponseEntity<?> removerHorario(
+            @RequestBody Map<String, String> map,
+            @RequestHeader(value = "Authorization") String token) {
+        try {
+            String disciplina = map.get("codigoDisciplina");
+            String matricula = map.get("codigoMatricula");
+            String ambiente = map.get("codigoAmbiente");
+            String turma = map.get("codigoTurma");
+            String periodo = map.get("codigoPeriodo");
+            String diaSemana = map.getOrDefault("diaSemana", "SEG");
+            Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
+            Time horario_fim = Time.valueOf(map.get("horarioFim"));
+
+            coordenadorDepartamentoService.removerAlocacoes(disciplina, matricula, ambiente, turma, periodo, diaSemana, horario_inicio, horario_fim);
+            return ResponseEntity.ok("Horário removido com sucesso!");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @PostMapping("/alterarHorario")
+    public ResponseEntity<?> alterarHorario(
+            @RequestBody Map<String, String> map,
+            @RequestHeader(value = "Authorization") String token) {
+        try {
+            String disciplina = map.get("codigoDisciplina");
+            String matricula = map.get("codigoMatricula");
+            String ambiente = map.get("codigoAmbiente");
+            String turma = map.get("codigoTurma");
+            String periodo = map.get("codigoPeriodo");
+            String diaSemana = map.getOrDefault("diaSemana", "SEG");
+            Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
+            Time horario_fim = Time.valueOf(map.get("horarioFim"));
+
+            coordenadorDepartamentoService.alterarAlocacoes(disciplina, matricula, ambiente, turma, periodo, diaSemana, horario_inicio, horario_fim);
+            return ResponseEntity.ok("Horário alterado com sucesso!");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
 }

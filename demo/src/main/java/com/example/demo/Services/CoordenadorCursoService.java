@@ -27,8 +27,12 @@ public class CoordenadorCursoService implements Recurso {
         try {
             return coordenadorRepository.loginRepository(email, password);
         } catch (Exception e) {
-            throw new Exception("Error: Credenciais invalidos" + e.getMessage());
+            throw new Exception("Error");
         }
+    }
+
+    public void updateConta(String email, String password) {
+        coordenadorRepository.updateSenhaByEmail(email, password);
     }
 
     @Override
@@ -65,7 +69,7 @@ public class CoordenadorCursoService implements Recurso {
                         .codigo(dados.get("codigo") != null ? dados.get("codigo").toString() : null)
                         .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
                         .cargaHoraria(dados.get("cargaHoraria") != null ? Integer.parseInt(dados.get("cargaHoraria").toString()) : 0)
-                        .curso(cursoEncontrado.getCodigo())
+                        .curso(cursoEncontrado != null ? cursoEncontrado.getCodigo() : cursoNome)
                         .build();
                 disciplinaRepository.save(disciplina);
                 break;
@@ -149,24 +153,11 @@ public class CoordenadorCursoService implements Recurso {
 
     @Transactional
     public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, Time horario_inicio, Time horario_fim) {
-        Disciplina disciplina = disciplinaRepository.findByCodigo(codigoDisciplina)
-                .orElseThrow(() -> new RuntimeException("Disciplina não encontrada: " + codigoDisciplina));
-        Docente docente = docenteRepository.findByMatricula(matriculaDocente)
-                .orElseThrow(() -> new RuntimeException("Docente não encontrado: " + matriculaDocente));
-        Ambiente ambiente = ambienteRepository.findByCodigo(codigoAmbiente)
-                .orElseThrow(() -> new RuntimeException("Ambiente não encontrado: " + codigoAmbiente));
-
-        AlocacaoHorario alocacao = AlocacaoHorario.builder()
-                .disciplina(disciplina)
-                .docente(docente)
-                .ambiente(ambiente)
-                .turma(codigoTurma)
-                .periodo(codigoPeriodo)
-                .diaSemana("SEG")
-                .horarioInicio(LocalTime.of(8, 0))
-                .horarioFim(LocalTime.of(10, 0))
-                .build();
-
         alocacaoHorarioRepository.alocarHorario(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, horario_inicio, horario_fim);
+    }
+
+    @Transactional
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, String diaSemana, Time horario_inicio, Time horario_fim) {
+        alocacaoHorarioRepository.alocarHorario(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, diaSemana, horario_inicio, horario_fim);
     }
 }

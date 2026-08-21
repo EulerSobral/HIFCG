@@ -36,6 +36,15 @@ public class CoordenadorCursoController {
         }
     }
 
+    @PutMapping("/alterarConta")
+    public ResponseEntity<?> alterarConta(@RequestBody Map<String, String> credentials) {
+        try {
+            coordenadorCursoService.updateConta(credentials.get("email"), credentials.get("password"));
+            return ResponseEntity.ok("Conta alterado com sucesso");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
     @PostMapping("/recursos/{tipoRecurso}")
     public ResponseEntity<?> cadastrarRecurso(
             @PathVariable int tipoRecurso,
@@ -75,7 +84,7 @@ public class CoordenadorCursoController {
         }
     }
 
-    @PostMapping("alocarRecurso")
+    @PostMapping("/alocarRecurso")
     public ResponseEntity<?> alocarRecurso(
             @RequestBody Map<String, String> map,
             @RequestHeader(value = "Authorization") String token) {
