@@ -16,11 +16,23 @@ public class DisciplinaRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public List<Disciplina> findAll() {
+        String sql = "SELECT * FROM disciplina";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Disciplina.builder()
+                .id(rs.getLong("id"))
+                .codigo(rs.getString("codigo"))
+                .nome(rs.getString("nome"))
+                .cargaHoraria(rs.getInt("carga_horaria"))
+                .curso(rs.getString("curso_id"))
+                .build());
+    }
+
     public void update(Disciplina disciplina) {
-        String sql = "UPDATE disciplina SET nome = ?, carga_horaria = ? WHERE codigo = ?";
+        String sql = "UPDATE disciplina SET nome = ?, carga_horaria = ?, curso_id = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
                 disciplina.getNome(),
                 disciplina.getCargaHoraria(),
+                disciplina.getCurso(),
                 disciplina.getCodigo());
     }
 
@@ -33,7 +45,7 @@ public class DisciplinaRepository {
                     disciplina.getCodigo(),
                     disciplina.getNome(),
                     disciplina.getCargaHoraria(),
-                    disciplina.getCurso());
+                    disciplina.getCurso() != null ? disciplina.getCurso() : "TADS");
         }
     }
 
@@ -44,6 +56,7 @@ public class DisciplinaRepository {
                 .codigo(rs.getString("codigo"))
                 .nome(rs.getString("nome"))
                 .cargaHoraria(rs.getInt("carga_horaria"))
+                .curso(rs.getString("curso_id"))
                 .build(), codigo);
         return list.stream().findFirst();
     }
@@ -57,17 +70,5 @@ public class DisciplinaRepository {
     public void deleteByCodigo(String codigo) {
         String sql = "DELETE FROM disciplina WHERE codigo = ?";
         jdbcTemplate.update(sql, codigo);
-    }
-
-    public List<Disciplina> findByCursoCodigo(String codigoCurso) {
-        String sql = "SELECT d.* FROM disciplina d JOIN curso c ON d.curso_id = c.id WHERE c.codigo = ?";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> Disciplina.builder()
-                .id(rs.getLong("id"))
-                .codigo(rs.getString("codigo"))
-                .nome(rs.getString("nome"))
-                .ementa(rs.getString("ementa"))
-                .especialidade(rs.getString("especialidade"))
-                .cargaHoraria(rs.getInt("carga_horaria"))
-                .build(), codigoCurso);
     }
 }

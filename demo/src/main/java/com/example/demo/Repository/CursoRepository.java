@@ -16,6 +16,18 @@ public class CursoRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public List<Curso> findAll() {
+        String sql = "SELECT * FROM curso";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Curso.builder()
+                .id(rs.getLong("id"))
+                .codigo(rs.getString("codigo"))
+                .nome(rs.getString("nome"))
+                .turno(rs.getString("turno"))
+                .nivel(rs.getString("nivel"))
+                .departamento(rs.getString("departamento"))
+                .build());
+    }
+
     public void update(Curso curso) {
         String sql = "UPDATE curso SET nome = ?, turno = ?, nivel = ?, departamento = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
@@ -36,7 +48,7 @@ public class CursoRepository {
                     curso.getNome(),
                     curso.getTurno(),
                     curso.getNivel(),
-                    curso.getDepartamento());
+                    curso.getDepartamento() != null ? curso.getDepartamento() : "Informática");
         }
     }
 
@@ -53,29 +65,6 @@ public class CursoRepository {
         return list.stream().findFirst();
     }
 
-    public boolean existsByCodigo(String codigo) {
-        String sql = "SELECT COUNT(*) FROM curso WHERE codigo = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, codigo);
-        return count != null && count > 0;
-    }
-
-    public void deleteByCodigo(String codigo) {
-        String sql = "DELETE FROM curso WHERE codigo = ?";
-        jdbcTemplate.update(sql, codigo);
-    }
-
-    public List<Curso> findByDepartamento(String departamento) {
-        String sql = "SELECT * FROM curso WHERE departamento = ?";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> Curso.builder()
-                .id(rs.getLong("id"))
-                .codigo(rs.getString("codigo"))
-                .nome(rs.getString("nome"))
-                .turno(rs.getString("turno"))
-                .nivel(rs.getString("nivel"))
-                .departamento(rs.getString("departamento"))
-                .build(), departamento);
-    }
-
     public List<Curso> findByNomeContainingIgnoreCase(String nome) {
         String sql = "SELECT * FROM curso WHERE LOWER(nome) LIKE LOWER(?)";
         return jdbcTemplate.query(sql, (rs, rowNum) -> Curso.builder()
@@ -85,6 +74,17 @@ public class CursoRepository {
                 .turno(rs.getString("turno"))
                 .nivel(rs.getString("nivel"))
                 .departamento(rs.getString("departamento"))
-                .build(), "%" + nome + "%");
+                .build(), "%" + (nome != null ? nome : "") + "%");
+    }
+
+    public boolean existsByCodigo(String codigo) {
+        String sql = "SELECT COUNT(*) FROM curso WHERE codigo = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, codigo);
+        return count != null && count > 0;
+    }
+
+    public void deleteByCodigo(String codigo) {
+        String sql = "DELETE FROM curso WHERE codigo = ?";
+        jdbcTemplate.update(sql, codigo);
     }
 }

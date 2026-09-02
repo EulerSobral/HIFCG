@@ -29,6 +29,9 @@ public class CoordenadorRepository {
             result.put("senha", (String) userLogin.get("senha"));
             result.put("nome", (String) userLogin.get("nome"));
             result.put("tipo_coordenador", (String) userLogin.get("tipo_coordenador"));
+            result.put("matricula", (String) userLogin.get("matricula"));
+            result.put("departamento", (String) userLogin.get("departamento"));
+            result.put("curso_codigo", (String) userLogin.get("curso_codigo"));
 
             return result;
         } catch (Exception e) {
@@ -36,26 +39,45 @@ public class CoordenadorRepository {
         }
     }
 
+    public List<Coordenador> findAll() {
+        String sql = "SELECT * FROM coordenador";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Coordenador.builder()
+                .id(rs.getLong("id"))
+                .matricula(rs.getString("matricula"))
+                .nome(rs.getString("nome"))
+                .email(rs.getString("email"))
+                .senha(rs.getString("senha"))
+                .tipoCoordenador(rs.getString("tipo_coordenador"))
+                .departamento(rs.getString("departamento"))
+                .cursoCodigo(rs.getString("curso_codigo"))
+                .build());
+    }
+
     public void save(Coordenador coordenador) {
-        String sql = "INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql,
-                coordenador.getMatricula(),
-                coordenador.getNome(),
-                coordenador.getEmail(),
-                coordenador.getSenha(),
-                coordenador.getTipoCoordenador(),
-                coordenador.getDepartamento(),
-                coordenador.getCursoCodigo());
+        if (existsByMatricula(coordenador.getMatricula())) {
+            update(coordenador);
+        } else {
+            String sql = "INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            jdbcTemplate.update(sql,
+                    coordenador.getMatricula(),
+                    coordenador.getNome(),
+                    coordenador.getEmail(),
+                    coordenador.getSenha(),
+                    coordenador.getTipoCoordenador(),
+                    coordenador.getDepartamento(),
+                    coordenador.getCursoCodigo());
+        }
     }
 
     public void update(Coordenador coordenador) {
-        String sql = "UPDATE coordenador SET nome = ?, email = ?, senha = ?, departamento = ?, curso_codigo = ? WHERE matricula = ?";
+        String sql = "UPDATE coordenador SET nome = ?, email = ?, senha = ?, departamento = ?, curso_codigo = ?, tipo_coordenador = ? WHERE matricula = ?";
         jdbcTemplate.update(sql,
                 coordenador.getNome(),
                 coordenador.getEmail(),
                 coordenador.getSenha(),
                 coordenador.getDepartamento(),
                 coordenador.getCursoCodigo(),
+                coordenador.getTipoCoordenador(),
                 coordenador.getMatricula());
     }
 
@@ -67,6 +89,7 @@ public class CoordenadorRepository {
     public Optional<Coordenador> findCoordenadorByMatricula(String matricula) {
         String sql = "SELECT * FROM coordenador WHERE matricula = ?";
         List<Coordenador> list = jdbcTemplate.query(sql, (rs, rowNum) -> Coordenador.builder()
+                .id(rs.getLong("id"))
                 .matricula(rs.getString("matricula"))
                 .nome(rs.getString("nome"))
                 .email(rs.getString("email"))
@@ -78,24 +101,34 @@ public class CoordenadorRepository {
         return list.stream().findFirst();
     }
 
-    public List<String> findByMatricula(String matricula) {
-        String sql = "select * from coordenador where matricula=?";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("matricula"));
-    }
-
-    public List<String> findByEmail(String email) {
-        String sql = "select * from coordenador where email = ?";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("email"));
+    public Optional<Coordenador> findByEmailObject(String email) {
+        String sql = "SELECT * FROM coordenador WHERE email = ?";
+        List<Coordenador> list = jdbcTemplate.query(sql, (rs, rowNum) -> Coordenador.builder()
+                .id(rs.getLong("id"))
+                .matricula(rs.getString("matricula"))
+                .nome(rs.getString("nome"))
+                .email(rs.getString("email"))
+                .senha(rs.getString("senha"))
+                .tipoCoordenador(rs.getString("tipo_coordenador"))
+                .departamento(rs.getString("departamento"))
+                .cursoCodigo(rs.getString("curso_codigo"))
+                .build(), email);
+        return list.stream().findFirst();
     }
 
     public boolean existsByMatricula(String matricula) {
-        String sql = "select count(*) from coordenador where matricula = ?";
+        String sql = "SELECT COUNT(*) FROM coordenador WHERE matricula = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, matricula);
         return count != null && count > 0;
     }
 
     public void deleteByMatricula(String matricula) {
-        String sql = "delete from coordenador where matricula = ?";
+        String sql = "DELETE FROM coordenador WHERE matricula = ?";
         jdbcTemplate.update(sql, matricula);
+    }
+
+    public void deleteById(Long id) {
+        String sql = "DELETE FROM coordenador WHERE id = ?";
+        jdbcTemplate.update(sql, id);
     }
 }

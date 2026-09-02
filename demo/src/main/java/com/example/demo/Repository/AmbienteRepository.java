@@ -16,6 +16,18 @@ public class AmbienteRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public List<Ambiente> findAll() {
+        String sql = "SELECT * FROM ambiente";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
+                .id(rs.getLong("id"))
+                .codigo(rs.getString("codigo"))
+                .nome(rs.getString("nome"))
+                .descricao(rs.getString("descricao"))
+                .capacidade(rs.getInt("capacidade"))
+                .tipo(rs.getString("tipo"))
+                .build());
+    }
+
     public void update(Ambiente ambiente) {
         String sql = "UPDATE ambiente SET nome = ?, descricao = ?, capacidade = ?, tipo = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
@@ -33,10 +45,10 @@ public class AmbienteRepository {
             String sql = "INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo) VALUES (?, ?, ?, ?, ?)";
             jdbcTemplate.update(sql,
                     ambiente.getCodigo(),
-                    ambiente.getNome(),
-                    ambiente.getDescricao(),
+                    ambiente.getNome() != null ? ambiente.getNome() : ambiente.getCodigo(),
+                    ambiente.getDescricao() != null ? ambiente.getDescricao() : "",
                     ambiente.getCapacidade(),
-                    ambiente.getTipo());
+                    ambiente.getTipo() != null ? ambiente.getTipo() : "Sala");
         }
     }
 
@@ -62,18 +74,5 @@ public class AmbienteRepository {
     public void deleteByCodigo(String codigo) {
         String sql = "DELETE FROM ambiente WHERE codigo = ?";
         jdbcTemplate.update(sql, codigo);
-    }
-
-    public Optional<Ambiente> findByNomeContainingIgnoreCaseOrCodigoContainingIgnoreCase(String nome, String codigo) {
-        String sql = "SELECT * FROM ambiente WHERE LOWER(nome) LIKE LOWER(?) OR codigo = ?";
-        List<Ambiente> list = jdbcTemplate.query(sql, (rs, rowNum) -> Ambiente.builder()
-                .id(rs.getLong("id"))
-                .codigo(rs.getString("codigo"))
-                .nome(rs.getString("nome"))
-                .descricao(rs.getString("descricao"))
-                .capacidade(rs.getInt("capacidade"))
-                .tipo(rs.getString("tipo"))
-                .build(), "%" + nome + "%", codigo);
-        return list.stream().findFirst();
     }
 }

@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS disciplina;
 DROP TABLE IF EXISTS curso;
 DROP TABLE IF EXISTS ambiente;
 DROP TABLE IF EXISTS docente;
+DROP TABLE IF EXISTS periodo;
 DROP TABLE IF EXISTS coordenador;
 
 -- 1. Tabela de Coordenadores e Administradores (RF31, RF33, RF38)
@@ -62,7 +63,19 @@ CREATE TABLE disciplina (
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
 
--- 6. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
+-- 6. Tabela de Períodos Letivos
+CREATE TABLE periodo (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    nome VARCHAR(100) NOT NULL,
+    inicio VARCHAR(20) NOT NULL,
+    fim VARCHAR(20) NOT NULL,
+    inicio_matricula VARCHAR(20),
+    fim_matricula VARCHAR(20),
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- 7. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
 CREATE TABLE alocacao_horario (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     disciplina VARCHAR(100) NOT NULL,
@@ -72,13 +85,10 @@ CREATE TABLE alocacao_horario (
     periodo VARCHAR(50) NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
-    horario_fim TIME NOT NULL,
-    CONSTRAINT fk_alocacao_disciplina FOREIGN KEY (disciplina) REFERENCES disciplina(codigo),
-    CONSTRAINT fk_alocacao_docente FOREIGN KEY (docente) REFERENCES docente(matricula),
-    CONSTRAINT fk_alocacao_ambiente FOREIGN KEY (ambiente) REFERENCES ambiente(codigo)
+    horario_fim TIME NOT NULL
 );
 
--- 7. Tabela de Log de Alterações e Auditoria (RF34)
+-- 8. Tabela de Log de Alterações e Auditoria (RF34)
 CREATE TABLE log_sistema (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     usuario_matricula VARCHAR(50) NOT NULL,
@@ -91,26 +101,50 @@ CREATE TABLE log_sistema (
 -- INSERÇÃO DE DADOS PADRÃO DE TESTES (SEEDS)
 -- =============================================================================
 
--- Coordenador de Departamento Padrão
+-- Diretor do Campus
 INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
-VALUES ('DEP001', 'Coordenador de Departamento Silva', 'coord.depto@ifpb.edu.br', 'senha123', 'AREA_DEPARTAMENTO', 'Informatica', NULL);
+VALUES ('DIR001', 'Dr. Roberto Lima', 'diretor@ifpb.edu.br', '123456', 'DIRETOR', 'Campus', NULL);
 
--- Coordenador de Curso Padrão
+-- Coordenador de Área (Departamento)
 INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
-VALUES ('COORD001', 'Coordenador de Curso Souza', 'coord.curso@ifpb.edu.br', 'senha123', 'CURSO', 'Informatica', 'ADS');
+VALUES ('DEP001', 'Profa. Ana Souza', 'area.info@ifpb.edu.br', '123456', 'AREA_DEPARTAMENTO', 'Informática', NULL);
 
--- Curso Padrão
+-- Coordenador de Curso
+INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
+VALUES ('COORD001', 'Prof. Carlos Mendes', 'curso.tads@ifpb.edu.br', '123456', 'CURSO', 'Informática', 'TADS');
+
+-- Período Letivo Padrão
+INSERT INTO periodo (codigo, nome, inicio, fim, inicio_matricula, fim_matricula, ativo)
+VALUES ('P1', '2026.1', '2026-02-10', '2026-07-05', '2026-01-20', '2026-02-15', TRUE);
+
+-- Cursos Padrão
 INSERT INTO curso (codigo, nome, turno, nivel, departamento)
-VALUES ('ADS', 'Análise e Desenvolvimento de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informatica');
+VALUES ('TADS', 'Tec. em Análise e Des. de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informática');
 
--- Docente Padrão
+INSERT INTO curso (codigo, nome, turno, nivel, departamento)
+VALUES ('INFO-INT', 'Técnico em Informática Integrado', 'INTEGRAL', 'TECNICO_INTEGRADO', 'Informática');
+
+-- Docentes Padrão
 INSERT INTO docente (matricula, nome, email, departamento)
-VALUES ('DOC001', 'Professor Carlos', 'carlos@ifpb.edu.br', 'Informatica');
+VALUES ('1001', 'Sicrano Pereira', 'sicrano@ifpb.edu.br', 'Matemática');
 
--- Ambiente Padrão
+INSERT INTO docente (matricula, nome, email, departamento)
+VALUES ('1002', 'Beltrano Silva', 'beltrano@ifpb.edu.br', 'Informática');
+
+-- Ambientes Padrão
 INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
-VALUES ('LAB1', 'Laboratório 1', 'Laboratório de Informática', 30, 'LABORATORIO');
+VALUES ('S-101', 'Sala 101', 'Sala de aula padrão', 40, 'SALA');
 
--- Disciplina Padrão
+INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
+VALUES ('LAB-01', 'Laboratório 01', 'Laboratório de Informática', 30, 'LABORATORIO');
+
+-- Disciplinas Padrão
 INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('DISC101', 'Estrutura de Dados', 60, 'ADS');
+VALUES ('MAT101', 'Matemática Discreta', 80, 'TADS');
+
+INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
+VALUES ('PRG101', 'Programação I', 80, 'TADS');
+
+-- Log de Inicialização
+INSERT INTO log_sistema (usuario_matricula, acao, detalhes)
+VALUES ('DIR001', 'sistema.inicio', 'Sistema HIFCG inicializado com dados padrão');

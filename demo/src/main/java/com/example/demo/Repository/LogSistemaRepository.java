@@ -4,6 +4,7 @@ import com.example.demo.Entity.LogSistema;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -15,17 +16,28 @@ public class LogSistemaRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public List<LogSistema> findAll() {
+        String sql = "SELECT * FROM log_sistema ORDER BY id DESC";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> LogSistema.builder()
+                .id(rs.getLong("id"))
+                .usuarioMatricula(rs.getString("usuario_matricula"))
+                .acao(rs.getString("acao"))
+                .detalhes(rs.getString("detalhes"))
+                .dataHora(rs.getTimestamp("data_hora") != null ? rs.getTimestamp("data_hora").toLocalDateTime() : LocalDateTime.now())
+                .build());
+    }
+
     public void save(LogSistema log) {
         String sql = "INSERT INTO log_sistema (usuario_matricula, acao, detalhes, data_hora) VALUES (?, ?, ?, ?)";
         jdbcTemplate.update(sql,
-                log.getUsuarioMatricula(),
+                log.getUsuarioMatricula() != null ? log.getUsuarioMatricula() : "sistema",
                 log.getAcao(),
                 log.getDetalhes(),
-                log.getDataHora());
+                log.getDataHora() != null ? log.getDataHora() : LocalDateTime.now());
     }
 
     public List<LogSistema> findByUsuarioMatricula(String usuarioMatricula) {
-        String sql = "SELECT * FROM log_sistema WHERE usuario_matricula = ?";
+        String sql = "SELECT * FROM log_sistema WHERE usuario_matricula = ? ORDER BY id DESC";
         return jdbcTemplate.query(sql, (rs, rowNum) -> LogSistema.builder()
                 .id(rs.getLong("id"))
                 .usuarioMatricula(rs.getString("usuario_matricula"))

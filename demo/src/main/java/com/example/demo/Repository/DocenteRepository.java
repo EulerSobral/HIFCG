@@ -16,6 +16,17 @@ public class DocenteRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public List<Docente> findAll() {
+        String sql = "SELECT * FROM docente";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Docente.builder()
+                .id(rs.getLong("id"))
+                .matricula(rs.getString("matricula"))
+                .nome(rs.getString("nome"))
+                .email(rs.getString("email"))
+                .departamento(rs.getString("departamento"))
+                .build());
+    }
+
     public void update(Docente docente) {
         String sql = "UPDATE docente SET nome = ?, email = ?, departamento = ? WHERE matricula = ?";
         jdbcTemplate.update(sql,
@@ -59,16 +70,5 @@ public class DocenteRepository {
     public void deleteByMatricula(String matricula) {
         String sql = "DELETE FROM docente WHERE matricula = ?";
         jdbcTemplate.update(sql, matricula);
-    }
-
-    public List<Docente> findByNomeContainingIgnoreCase(String termo) {
-        String sql = "SELECT * FROM docente WHERE LOWER(nome) LIKE LOWER(?)";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> Docente.builder()
-                .id(rs.getLong("id"))
-                .matricula(rs.getString("matricula"))
-                .nome(rs.getString("nome"))
-                .email(rs.getString("email"))
-                .departamento(rs.getString("departamento"))
-                .build(), "%" + termo + "%");
     }
 }

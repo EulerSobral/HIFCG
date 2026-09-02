@@ -4,6 +4,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Time;
+import java.util.List;
+import java.util.Map;
 
 @Repository
 public class AlocacaoHorarioRepository {
@@ -12,6 +14,11 @@ public class AlocacaoHorarioRepository {
 
     public AlocacaoHorarioRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public List<Map<String, Object>> findAllMap() {
+        String sql = "SELECT * FROM alocacao_horario";
+        return jdbcTemplate.queryForList(sql);
     }
 
     public void alocarHorario(String disciplina, String docente, String ambiente, String turma, String periodo, Time horarioInicio, Time horarioFim) {

@@ -1,5 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  loginApi,
+  addDocenteApi,
+  removeDocenteApi,
+  addAmbienteApi,
+  removeAmbienteApi,
+  addCursoApi,
+  removeCursoApi,
+  addDisciplinaApi,
+  removeDisciplinaApi,
+  addPeriodoApi,
+  removePeriodoApi,
+  addCoordenadorApi,
+  removeCoordenadorApi,
+  addLogApi,
+} from "./api";
 
 export type Role = "diretor" | "coord_area" | "coord_curso";
 
@@ -201,6 +217,31 @@ export const useStore = create<State>()(
       logs: [],
 
       login: async (email, senha) => {
+        // Tenta autenticação no backend Spring Boot primeiro
+        const backendUser = await loginApi(email, senha);
+        if (backendUser) {
+          let userInStore = get().users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
+          if (!userInStore) {
+            const salt = randomSalt();
+            const senhaHash = await hashSenha(salt, senha);
+            userInStore = {
+              id: backendUser.id || uid(),
+              nome: backendUser.nome,
+              email: backendUser.email,
+              salt,
+              senhaHash,
+              role: backendUser.role as Role,
+              area: backendUser.area,
+              cursoId: backendUser.cursoId,
+            };
+            set((s) => ({ users: [...s.users, userInStore!] }));
+          }
+          set({ currentUserId: userInStore.id });
+          get().addLog("login", `Usuário ${userInStore.nome} acessou o sistema via backend`);
+          return userInStore;
+        }
+
+        // Fallback local
         const u = get().users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
         if (!u) return null;
         const hash = await hashSenha(u.salt, senha);
@@ -214,6 +255,7 @@ export const useStore = create<State>()(
       addLog: (acao, detalhe) => {
         const uId = get().currentUserId;
         const user = get().users.find((u) => u.id === uId);
+        addLogApi({ usuarioMatricula: user?.id, acao, detalhes: detalhe });
         set((s) => ({
           logs: [
             { id: uid(), userId: uId ?? "anon", userName: user?.nome ?? "Sistema", acao, detalhe, timestamp: new Date().toISOString() },
@@ -222,44 +264,127 @@ export const useStore = create<State>()(
         }));
       },
 
-      addDocente: (d) => { set((s) => ({ docentes: [...s.docentes, { ...d, id: uid() }] })); get().addLog("docente.criar", d.nome); },
-      updateDocente: (id, d) => { set((s) => ({ docentes: s.docentes.map((x) => (x.id === id ? { ...x, ...d } : x)) })); get().addLog("docente.editar", id); },
-      removeDocente: (id) => { set((s) => ({ docentes: s.docentes.filter((x) => x.id !== id) })); get().addLog("docente.remover", id); },
+      addDocente: (d) => {
+        const id = uid();
+        set((s) => ({ docentes: [...s.docentes, { ...d, id }] }));
+        addDocenteApi({ matricula: d.matricula, nome: d.nome, email: d.email, departamento: d.area });
+        get().addLog("docente.criar", d.nome);
+      },
+      updateDocente: (id, d) => {
+        set((s) => ({ docentes: s.docentes.map((x) => (x.id === id ? { ...x, ...d } : x)) }));
+        const target = get().docentes.find((x) => x.id === id);
+        if (target) addDocenteApi({ matricula: target.matricula, nome: target.nome, email: target.email, departamento: target.area });
+        get().addLog("docente.editar", id);
+      },
+      removeDocente: (id) => {
+        const target = get().docentes.find((x) => x.id === id);
+        if (target) removeDocenteApi(target.matricula);
+        set((s) => ({ docentes: s.docentes.filter((x) => x.id !== id) }));
+        get().addLog("docente.remover", id);
+      },
 
-      addAmbiente: (a) => { set((s) => ({ ambientes: [...s.ambientes, { ...a, id: uid() }] })); get().addLog("ambiente.criar", a.codigo); },
-      updateAmbiente: (id, a) => { set((s) => ({ ambientes: s.ambientes.map((x) => (x.id === id ? { ...x, ...a } : x)) })); get().addLog("ambiente.editar", id); },
-      removeAmbiente: (id) => { set((s) => ({ ambientes: s.ambientes.filter((x) => x.id !== id) })); get().addLog("ambiente.remover", id); },
+      addAmbiente: (a) => {
+        const id = uid();
+        set((s) => ({ ambientes: [...s.ambientes, { ...a, id }] }));
+        addAmbienteApi({ codigo: a.codigo, nome: a.codigo, descricao: a.descricao || "", capacidade: a.capacidade, tipo: a.tipo });
+        get().addLog("ambiente.criar", a.codigo);
+      },
+      updateAmbiente: (id, a) => {
+        set((s) => ({ ambientes: s.ambientes.map((x) => (x.id === id ? { ...x, ...a } : x)) }));
+        const target = get().ambientes.find((x) => x.id === id);
+        if (target) addAmbienteApi({ codigo: target.codigo, nome: target.codigo, descricao: target.descricao || "", capacidade: target.capacidade, tipo: target.tipo });
+        get().addLog("ambiente.editar", id);
+      },
+      removeAmbiente: (id) => {
+        const target = get().ambientes.find((x) => x.id === id);
+        if (target) removeAmbienteApi(target.codigo);
+        set((s) => ({ ambientes: s.ambientes.filter((x) => x.id !== id) }));
+        get().addLog("ambiente.remover", id);
+      },
 
-      addCurso: (c) => { set((s) => ({ cursos: [...s.cursos, { ...c, id: uid() }] })); get().addLog("curso.criar", c.nome); },
-      updateCurso: (id, c) => { set((s) => ({ cursos: s.cursos.map((x) => (x.id === id ? { ...x, ...c } : x)) })); get().addLog("curso.editar", id); },
-      removeCurso: (id) => { set((s) => ({ cursos: s.cursos.filter((x) => x.id !== id) })); get().addLog("curso.remover", id); },
+      addCurso: (c) => {
+        const id = uid();
+        set((s) => ({ cursos: [...s.cursos, { ...c, id }] }));
+        addCursoApi({ codigo: c.codigo, nome: c.nome, turno: c.turno, nivel: c.nivel, departamento: c.area });
+        get().addLog("curso.criar", c.nome);
+      },
+      updateCurso: (id, c) => {
+        set((s) => ({ cursos: s.cursos.map((x) => (x.id === id ? { ...x, ...c } : x)) }));
+        const target = get().cursos.find((x) => x.id === id);
+        if (target) addCursoApi({ codigo: target.codigo, nome: target.nome, turno: target.turno, nivel: target.nivel, departamento: target.area });
+        get().addLog("curso.editar", id);
+      },
+      removeCurso: (id) => {
+        const target = get().cursos.find((x) => x.id === id);
+        if (target) removeCursoApi(target.codigo);
+        set((s) => ({ cursos: s.cursos.filter((x) => x.id !== id) }));
+        get().addLog("curso.remover", id);
+      },
 
-      addDisciplina: (d) => { set((s) => ({ disciplinas: [...s.disciplinas, { ...d, id: uid() }] })); get().addLog("disciplina.criar", d.nome); },
-      updateDisciplina: (id, d) => { set((s) => ({ disciplinas: s.disciplinas.map((x) => (x.id === id ? { ...x, ...d } : x)) })); get().addLog("disciplina.editar", id); },
-      removeDisciplina: (id) => { set((s) => ({ disciplinas: s.disciplinas.filter((x) => x.id !== id) })); get().addLog("disciplina.remover", id); },
+      addDisciplina: (d) => {
+        const id = uid();
+        set((s) => ({ disciplinas: [...s.disciplinas, { ...d, id }] }));
+        addDisciplinaApi({ codigo: d.codigo, nome: d.nome, cargaHoraria: d.cargaHoraria, curso: d.cursoId });
+        get().addLog("disciplina.criar", d.nome);
+      },
+      updateDisciplina: (id, d) => {
+        set((s) => ({ disciplinas: s.disciplinas.map((x) => (x.id === id ? { ...x, ...d } : x)) }));
+        const target = get().disciplinas.find((x) => x.id === id);
+        if (target) addDisciplinaApi({ codigo: target.codigo, nome: target.nome, cargaHoraria: target.cargaHoraria, curso: target.cursoId });
+        get().addLog("disciplina.editar", id);
+      },
+      removeDisciplina: (id) => {
+        const target = get().disciplinas.find((x) => x.id === id);
+        if (target) removeDisciplinaApi(target.codigo);
+        set((s) => ({ disciplinas: s.disciplinas.filter((x) => x.id !== id) }));
+        get().addLog("disciplina.remover", id);
+      },
 
-      addPeriodo: (p) => { set((s) => ({ periodos: [...s.periodos, { ...p, id: uid() }] })); get().addLog("periodo.criar", p.nome); },
-      updatePeriodo: (id, p) => { set((s) => ({ periodos: s.periodos.map((x) => (x.id === id ? { ...x, ...p } : x)) })); get().addLog("periodo.editar", id); },
-      removePeriodo: (id) => { set((s) => ({ periodos: s.periodos.filter((x) => x.id !== id) })); get().addLog("periodo.remover", id); },
+      addPeriodo: (p) => {
+        const id = uid();
+        set((s) => ({ periodos: [...s.periodos, { ...p, id }] }));
+        addPeriodoApi({ codigo: p.nome, nome: p.nome, inicio: p.inicio, fim: p.fim, inicioMatricula: p.inicioMatricula, fimMatricula: p.fimMatricula, ativo: p.ativo });
+        get().addLog("periodo.criar", p.nome);
+      },
+      updatePeriodo: (id, p) => {
+        set((s) => ({ periodos: s.periodos.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+        const target = get().periodos.find((x) => x.id === id);
+        if (target) addPeriodoApi({ codigo: target.nome, nome: target.nome, inicio: target.inicio, fim: target.fim, inicioMatricula: target.inicioMatricula, fimMatricula: target.fimMatricula, ativo: target.ativo });
+        get().addLog("periodo.editar", id);
+      },
+      removePeriodo: (id) => {
+        const target = get().periodos.find((x) => x.id === id);
+        if (target) removePeriodoApi(target.nome);
+        set((s) => ({ periodos: s.periodos.filter((x) => x.id !== id) }));
+        get().addLog("periodo.remover", id);
+      },
 
       addUser: async ({ senha, ...u }) => {
         const salt = randomSalt();
         const senhaHash = await hashSenha(salt, senha);
         set((s) => ({ users: [...s.users, { ...u, id: uid(), salt, senhaHash }] }));
+        addCoordenadorApi({ nome: u.nome, email: u.email, senha, role: u.role, area: u.area, cursoId: u.cursoId });
         get().addLog("usuario.criar", u.nome);
       },
-      updateUser: (id, u) => { set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, ...u } : x)) })); get().addLog("usuario.editar", id); },
+      updateUser: (id, u) => {
+        set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, ...u } : x)) }));
+        get().addLog("usuario.editar", id);
+      },
       setUserPassword: async (id, senha) => {
         const salt = randomSalt();
         const senhaHash = await hashSenha(salt, senha);
         set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, salt, senhaHash } : x)) }));
         get().addLog("usuario.senha", id);
       },
-      removeUser: (id) => { set((s) => ({ users: s.users.filter((x) => x.id !== id) })); get().addLog("usuario.remover", id); },
+      removeUser: (id) => {
+        const target = get().users.find((x) => x.id === id);
+        if (target) removeCoordenadorApi(target.id);
+        set((s) => ({ users: s.users.filter((x) => x.id !== id) }));
+        get().addLog("usuario.remover", id);
+      },
 
       setAlocacao: (a) => {
         const id = a.id ?? uid();
-        // detect conflict: same docente OR mesmo ambiente OR mesmo curso no mesmo dia/horario/periodo
         const conflict = get().alocacoes.find(
           (x) =>
             x.id !== id &&
@@ -278,12 +403,14 @@ export const useStore = create<State>()(
         get().addLog("alocacao.salvar", `${a.dia}/${a.horario}`);
         return conflict ? conflict.id : null;
       },
-      removeAlocacao: (id) => { set((s) => ({ alocacoes: s.alocacoes.filter((x) => x.id !== id) })); get().addLog("alocacao.remover", id); },
+      removeAlocacao: (id) => {
+        set((s) => ({ alocacoes: s.alocacoes.filter((x) => x.id !== id) }));
+        get().addLog("alocacao.remover", id);
+      },
     }),
     {
-      name: "hifcg-store-v3",
-      version: 3,
-      // Descarta qualquer estado antigo que guardava senhas em texto puro.
+      name: "hifcg-store-v4",
+      version: 4,
       migrate: (persisted) => {
         const s = persisted as Partial<State> | undefined;
         return { ...(s ?? {}), users: seedUsers, currentUserId: null } as State;

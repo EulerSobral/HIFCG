@@ -10,6 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/CoordenadorDepartamento")
+@CrossOrigin(origins = "*")
 public class CoordenadorDepartamentoController {
 
     private final CoordenadorDepartamentoService coordenadorDepartamentoService;
