@@ -57,6 +57,7 @@ export interface Curso {
   turno: "Integral" | "Matutino" | "Vespertino" | "Noturno";
   nivel: "Técnico Subsequente" | "Técnico Integrado" | "Superior" | "Pós-Graduação";
   area: string;
+  periodos: number;
 }
 
 export interface Disciplina {
@@ -84,7 +85,7 @@ export interface Alocacao {
   docenteId: string;
   ambienteId: string;
   cursoId: string;
-  periodoId: string;
+  periodoCurso: number;
   dia: number; // 0=Seg .. 5=Sáb
   horario: string; // "08:00-09:40"
 }
@@ -186,9 +187,9 @@ const seedAmbientes: Ambiente[] = [
 ];
 
 const seedCursos: Curso[] = [
-  { id: "c1", codigo: "TADS", nome: "Tec. em Análise e Des. de Sistemas", turno: "Noturno", nivel: "Superior", area: "Informática" },
-  { id: "c2", codigo: "INFO-INT", nome: "Técnico em Informática Integrado", turno: "Integral", nivel: "Técnico Integrado", area: "Informática" },
-  { id: "c3", codigo: "ELET", nome: "Técnico em Eletromecânica", turno: "Matutino", nivel: "Técnico Subsequente", area: "Indústria" },
+  { id: "c1", codigo: "TADS", nome: "Tec. em Análise e Des. de Sistemas", turno: "Noturno", nivel: "Superior", area: "Informática", periodos: 6 },
+  { id: "c2", codigo: "INFO-INT", nome: "Técnico em Informática Integrado", turno: "Integral", nivel: "Técnico Integrado", area: "Informática", periodos: 8 },
+  { id: "c3", codigo: "ELET", nome: "Técnico em Eletromecânica", turno: "Matutino", nivel: "Técnico Subsequente", area: "Indústria", periodos: 4 },
 ];
 
 const seedDisciplinas: Disciplina[] = [
@@ -304,14 +305,15 @@ export const useStore = create<State>()(
 
       addCurso: (c) => {
         const id = uid();
-        set((s) => ({ cursos: [...s.cursos, { ...c, id }] }));
-        addCursoApi({ codigo: c.codigo, nome: c.nome, turno: c.turno, nivel: c.nivel, departamento: c.area });
+        const nextCurso = { ...c, periodos: c.periodos ?? 6, id };
+        set((s) => ({ cursos: [...s.cursos, nextCurso] }));
+        addCursoApi({ codigo: c.codigo, nome: c.nome, turno: c.turno, nivel: c.nivel, departamento: c.area, periodos: c.periodos });
         get().addLog("curso.criar", c.nome);
       },
       updateCurso: (id, c) => {
         set((s) => ({ cursos: s.cursos.map((x) => (x.id === id ? { ...x, ...c } : x)) }));
         const target = get().cursos.find((x) => x.id === id);
-        if (target) addCursoApi({ codigo: target.codigo, nome: target.nome, turno: target.turno, nivel: target.nivel, departamento: target.area });
+        if (target) addCursoApi({ codigo: target.codigo, nome: target.nome, turno: target.turno, nivel: target.nivel, departamento: target.area, periodos: target.periodos });
         get().addLog("curso.editar", id);
       },
       removeCurso: (id) => {
@@ -388,10 +390,11 @@ export const useStore = create<State>()(
         const conflict = get().alocacoes.find(
           (x) =>
             x.id !== id &&
-            x.periodoId === a.periodoId &&
             x.dia === a.dia &&
             x.horario === a.horario &&
-            (x.docenteId === a.docenteId || x.ambienteId === a.ambienteId || x.cursoId === a.cursoId),
+            (x.docenteId === a.docenteId ||
+              x.ambienteId === a.ambienteId ||
+              (x.cursoId === a.cursoId && x.periodoCurso === a.periodoCurso)),
         );
         set((s) => {
           const exists = s.alocacoes.some((x) => x.id === id);
@@ -409,11 +412,13 @@ export const useStore = create<State>()(
       },
     }),
     {
-      name: "hifcg-store-v4",
-      version: 4,
+      name: "hifcg-store-v6",
+      version: 6,
       migrate: (persisted) => {
         const s = persisted as Partial<State> | undefined;
-        return { ...(s ?? {}), users: seedUsers, currentUserId: null } as State;
+        const cursos = (s?.cursos ?? seedCursos).map((c) => ({ ...c, periodos: c.periodos ?? 6 }));
+        const alocacoes = (s?.alocacoes ?? []).map((a) => ({ ...a, periodoCurso: (a as any).periodoCurso ?? 1 }));
+        return { ...(s ?? {}), cursos, alocacoes, users: seedUsers, currentUserId: null } as State;
       },
     },
   ),

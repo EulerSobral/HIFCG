@@ -15,48 +15,72 @@ export const Route = createFileRoute("/_app/visualizar")({
 
 function Page() {
   const s = useStore();
-  const [periodoId, setPeriodoId] = useState(s.periodos.find((p) => p.ativo)?.id ?? s.periodos[0]?.id ?? "");
   const [cursoId, setCursoId] = useState(s.cursos[0]?.id ?? "");
+  const selectedCurso = useMemo(() => s.cursos.find((c) => c.id === cursoId), [s.cursos, cursoId]);
+  const [periodoCurso, setPeriodoCurso] = useState<number>(1);
+  const listaPeriodosCurso = useMemo(
+    () => Array.from({ length: selectedCurso?.periodos ?? 6 }, (_, i) => i + 1),
+    [selectedCurso],
+  );
+
   const [docenteId, setDocenteId] = useState(s.docentes[0]?.id ?? "");
+  const [periodoGeral, setPeriodoGeral] = useState<number>(1);
 
   return (
     <div>
-      <PageHeader title="Visualizar horários" description="Por curso, docente ou período (RF26-RF28, RF37)." />
-      <Card className="p-4 mb-4">
-        <Label className="mb-2 block">Período letivo</Label>
-        <Select value={periodoId} onValueChange={setPeriodoId}>
-          <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>{s.periodos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-        </Select>
-      </Card>
+      <PageHeader title="Visualizar horários" description="Por curso, docente ou período do curso (RF26-RF28, RF37)." />
       <Tabs defaultValue="curso">
         <TabsList>
-          <TabsTrigger value="curso">Por curso</TabsTrigger>
+          <TabsTrigger value="curso">Por curso e período</TabsTrigger>
           <TabsTrigger value="docente">Por docente</TabsTrigger>
-          <TabsTrigger value="periodo">Período completo</TabsTrigger>
+          <TabsTrigger value="periodo">Geral por período do curso</TabsTrigger>
         </TabsList>
         <TabsContent value="curso" className="mt-4 space-y-4">
-          <Combobox
-            className="max-w-md"
-            options={s.cursos.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
-            value={cursoId}
-            onChange={setCursoId}
-            placeholder="Buscar curso…"
-          />
-          <Grid filter={(a) => a.periodoId === periodoId && a.cursoId === cursoId} showCurso={false} />
+          <div className="grid md:grid-cols-2 gap-4 max-w-xl">
+            <div className="space-y-2">
+              <Label>Curso</Label>
+              <Combobox
+                options={s.cursos.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
+                value={cursoId}
+                onChange={(v) => { setCursoId(v); setPeriodoCurso(1); }}
+                placeholder="Buscar curso…"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Período do curso</Label>
+              <Select value={String(periodoCurso)} onValueChange={(v) => setPeriodoCurso(Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {listaPeriodosCurso.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Grid filter={(a) => a.cursoId === cursoId && a.periodoCurso === periodoCurso} showCurso={false} />
         </TabsContent>
         <TabsContent value="docente" className="mt-4 space-y-4">
-          <Combobox
-            className="max-w-md"
-            options={s.docentes.map((d) => ({ value: d.id, label: d.nome, hint: d.area }))}
-            value={docenteId}
-            onChange={setDocenteId}
-            placeholder="Buscar docente…"
-          />
-          <Grid filter={(a) => a.periodoId === periodoId && a.docenteId === docenteId} showCurso />
+          <div className="space-y-2 max-w-md">
+            <Label>Docente</Label>
+            <Combobox
+              options={s.docentes.map((d) => ({ value: d.id, label: d.nome, hint: d.area }))}
+              value={docenteId}
+              onChange={setDocenteId}
+              placeholder="Buscar docente…"
+            />
+          </div>
+          <Grid filter={(a) => a.docenteId === docenteId} showCurso />
         </TabsContent>
-        <TabsContent value="periodo" className="mt-4">
-          <Grid filter={(a) => a.periodoId === periodoId} showCurso />
+        <TabsContent value="periodo" className="mt-4 space-y-4">
+          <div className="space-y-2 max-w-xs">
+            <Label>Período do curso (todos os cursos)</Label>
+            <Select value={String(periodoGeral)} onValueChange={(v) => setPeriodoGeral(Number(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Grid filter={(a) => a.periodoCurso === periodoGeral} showCurso />
         </TabsContent>
       </Tabs>
     </div>
@@ -92,7 +116,7 @@ function Grid({ filter, showCurso }: { filter: (a: Alocacao) => boolean; showCur
                           <div key={a.id} className="rounded-md bg-primary/10 border border-primary/30 p-2">
                             <div className="font-semibold">{d?.codigo}</div>
                             <div className="text-muted-foreground truncate">{doc?.nome}</div>
-                            <div className="text-[10px] text-muted-foreground">{amb?.codigo}{showCurso && curso ? ` · ${curso.codigo}` : ""}</div>
+                            <div className="text-[10px] text-muted-foreground">{amb?.codigo}{showCurso && curso ? ` · ${curso.codigo} (${a.periodoCurso}º per.)` : ""}</div>
                           </div>
                         );
                       })}

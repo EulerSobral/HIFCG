@@ -1,5 +1,6 @@
 package com.example.demo.Repository;
 
+import com.example.demo.Entity.Curso;
 import com.example.demo.Entity.Disciplina;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -11,9 +12,11 @@ import java.util.Optional;
 public class DisciplinaRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final CursoRepository cursoRepository;
 
-    public DisciplinaRepository(JdbcTemplate jdbcTemplate) {
+    public DisciplinaRepository(JdbcTemplate jdbcTemplate, CursoRepository cursoRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.cursoRepository = cursoRepository;
     }
 
     public List<Disciplina> findAll() {
@@ -28,15 +31,17 @@ public class DisciplinaRepository {
     }
 
     public void update(Disciplina disciplina) {
+        String cursoCodigo = resolveCursoCodigo(disciplina.getCurso());
         String sql = "UPDATE disciplina SET nome = ?, carga_horaria = ?, curso_id = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
                 disciplina.getNome(),
                 disciplina.getCargaHoraria(),
-                disciplina.getCurso(),
+                cursoCodigo,
                 disciplina.getCodigo());
     }
 
     public void save(Disciplina disciplina) {
+        String cursoCodigo = resolveCursoCodigo(disciplina.getCurso());
         if (existsByCodigo(disciplina.getCodigo())) {
             update(disciplina);
         } else {
@@ -45,8 +50,34 @@ public class DisciplinaRepository {
                     disciplina.getCodigo(),
                     disciplina.getNome(),
                     disciplina.getCargaHoraria(),
-                    disciplina.getCurso() != null ? disciplina.getCurso() : "TADS");
+                    cursoCodigo);
         }
+    }
+
+    private String resolveCursoCodigo(String inputCurso) {
+        if (inputCurso != null && cursoRepository.existsByCodigo(inputCurso)) {
+            return inputCurso;
+        }
+        if (inputCurso != null) {
+            List<Curso> list = cursoRepository.findByNomeContainingIgnoreCase(inputCurso);
+            if (!list.isEmpty()) {
+                return list.get(0).getCodigo();
+            }
+        }
+        List<Curso> todos = cursoRepository.findAll();
+        if (!todos.isEmpty()) {
+            return todos.get(0).getCodigo();
+        }
+        // Se a tabela curso estiver vazia, cria o curso padrão TADS para evitar erro de Foreign Key
+        Curso padrao = Curso.builder()
+                .codigo("TADS")
+                .nome("Tec. em Análise e Des. de Sistemas")
+                .turno("NOTURNO")
+                .nivel("SUPERIOR")
+                .departamento("Informática")
+                .build();
+        cursoRepository.save(padrao);
+        return "TADS";
     }
 
     public Optional<Disciplina> findByCodigo(String codigo) {

@@ -221,8 +221,20 @@ public class ApiController {
     }
 
     @PostMapping("/disciplinas")
-    public ResponseEntity<?> addDisciplina(@RequestBody Disciplina d) {
+    public ResponseEntity<?> addDisciplina(@RequestBody Map<String, Object> body) {
         try {
+            String codigo = body.get("codigo") != null ? body.get("codigo").toString() : "DISC" + (System.currentTimeMillis() % 10000);
+            String nome = body.get("nome") != null ? body.get("nome").toString() : "Nova Disciplina";
+            int cargaHoraria = body.get("cargaHoraria") != null ? Integer.parseInt(body.get("cargaHoraria").toString()) : 60;
+            String curso = body.get("curso") != null ? body.get("curso").toString() : (body.get("cursoId") != null ? body.get("cursoId").toString() : "TADS");
+
+            Disciplina d = Disciplina.builder()
+                    .codigo(codigo)
+                    .nome(nome)
+                    .cargaHoraria(cargaHoraria)
+                    .curso(curso)
+                    .build();
+
             disciplinaRepository.save(d);
             return ResponseEntity.ok(d);
         } catch (Exception ex) {
@@ -279,7 +291,8 @@ public class ApiController {
             String doc = body.get("docente");
             String amb = body.get("ambiente");
             String turma = body.getOrDefault("turma", "T1");
-            String per = body.getOrDefault("periodo", "P1");
+            String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");
+            Integer per = (perStr != null && !perStr.isEmpty()) ? Integer.parseInt(perStr.replaceAll("\\D+", "")) : 1;
             String dia = body.getOrDefault("diaSemana", "SEG");
             Time hIni = Time.valueOf(body.getOrDefault("horarioInicio", "08:00:00"));
             Time hFim = Time.valueOf(body.getOrDefault("horarioFim", "09:40:00"));

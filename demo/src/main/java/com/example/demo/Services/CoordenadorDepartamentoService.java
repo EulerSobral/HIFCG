@@ -154,20 +154,25 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
         }
     }
 
-    public void cadastrarCurso(String codigo, String nome, String turno, String nivel, String departamento) {
+    public void cadastrarCurso(String codigo, String nome, String turno, String nivel, String departamento, Integer periodos) {
         Curso curso = Curso.builder()
                 .codigo(codigo)
                 .nome(nome)
                 .turno(turno)
                 .nivel(nivel)
                 .departamento(departamento != null && !departamento.isEmpty() ? departamento : "Informatica")
+                .periodos(periodos != null && periodos > 0 ? periodos : 6)
                 .build();
 
         cursoRepository.save(curso);
     }
 
+    public void cadastrarCurso(String codigo, String nome, String turno, String nivel, String departamento) {
+        cadastrarCurso(codigo, nome, turno, nivel, departamento, 6);
+    }
+
     public void cadastrarCurso(String codigo, String nome, String turno, String nivel) {
-        cadastrarCurso(codigo, nome, turno, nivel, "Informatica");
+        cadastrarCurso(codigo, nome, turno, nivel, "Informatica", 6);
     }
 
     @Override
@@ -204,12 +209,24 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
     }
 
     @Transactional
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, Integer periodo, Time horario_inicio, Time horario_fim) {
+        alocarRecurso(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, periodo, "SEG", horario_inicio, horario_fim);
+    }
+
+    @Transactional
     public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, Time horario_inicio, Time horario_fim) {
-        alocarRecurso(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, codigoPeriodo, "SEG", horario_inicio, horario_fim);
+        Integer periodo = (codigoPeriodo != null && !codigoPeriodo.isEmpty()) ? Integer.parseInt(codigoPeriodo.replaceAll("\\D+", "")) : 1;
+        alocarRecurso(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, periodo, "SEG", horario_inicio, horario_fim);
     }
 
     @Transactional
     public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, String codigoPeriodo, String diaSemana, Time horario_inicio, Time horario_fim) {
+        Integer periodo = (codigoPeriodo != null && !codigoPeriodo.isEmpty()) ? Integer.parseInt(codigoPeriodo.replaceAll("\\D+", "")) : 1;
+        alocarRecurso(codigoDisciplina, matriculaDocente, codigoAmbiente, codigoTurma, periodo, diaSemana, horario_inicio, horario_fim);
+    }
+
+    @Transactional
+    public void alocarRecurso(String codigoDisciplina, String matriculaDocente, String codigoAmbiente, String codigoTurma, Integer periodo, String diaSemana, Time horario_inicio, Time horario_fim) {
         if (!disciplinaRepository.existsByCodigo(codigoDisciplina)) {
             throw new RuntimeException("Disciplina não encontrada: " + codigoDisciplina);
         }
@@ -225,32 +242,28 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
                 matriculaDocente,
                 codigoAmbiente,
                 codigoTurma,
-                codigoPeriodo,
+                periodo,
                 diaSemana != null && !diaSemana.isEmpty() ? diaSemana : "SEG",
                 horario_inicio,
                 horario_fim
         );
     }
 
-    public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
-        alocacaoHorarioRepository.removerAlocacoes(disciplina,
-                docente,
-                ambiente,
-                turma,
-                periodo,
-                diaSemana,
-                horarioInicio,
-                horarioFim);
+    public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, Integer periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        alocacaoHorarioRepository.removerAlocacoes(disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
     }
 
-    public void alterarAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
-        alocacaoHorarioRepository.alterarAlocacao(disciplina,
-                docente,
-                ambiente,
-                turma,
-                periodo,
-                diaSemana,
-                horarioInicio,
-                horarioFim);
+    public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodoStr, String diaSemana, Time horarioInicio, Time horarioFim) {
+        Integer periodo = (periodoStr != null && !periodoStr.isEmpty()) ? Integer.parseInt(periodoStr.replaceAll("\\D+", "")) : 1;
+        removerAlocacoes(disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
+    }
+
+    public void alterarAlocacoes(String disciplina, String docente, String ambiente, String turma, Integer periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        alocacaoHorarioRepository.alterarAlocacao(disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
+    }
+
+    public void alterarAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodoStr, String diaSemana, Time horarioInicio, Time horarioFim) {
+        Integer periodo = (periodoStr != null && !periodoStr.isEmpty()) ? Integer.parseInt(periodoStr.replaceAll("\\D+", "")) : 1;
+        alterarAlocacoes(disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
     }
 }

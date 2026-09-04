@@ -50,7 +50,8 @@ CREATE TABLE curso (
     nome VARCHAR(100) NOT NULL,
     turno VARCHAR(30) NOT NULL, -- 'INTEGRAL', 'MATUTINO', 'VESPERTINO', 'NOTURNO'
     nivel VARCHAR(50) NOT NULL, -- 'TECNICO_INTEGRADO', 'SUPERIOR', 'POS_GRADUACAO'
-    departamento VARCHAR(100) NOT NULL
+    departamento VARCHAR(100) NOT NULL,
+    periodos INT DEFAULT 6 NOT NULL
 );
 
 -- 5. Tabela de Disciplinas (RF16, RF17, RF18)
@@ -82,7 +83,7 @@ CREATE TABLE alocacao_horario (
     docente VARCHAR(100) NOT NULL,
     ambiente VARCHAR(100) NOT NULL,
     turma VARCHAR(100) NOT NULL,
-    periodo VARCHAR(50) NOT NULL,
+    periodo INT NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL
@@ -118,11 +119,11 @@ INSERT INTO periodo (codigo, nome, inicio, fim, inicio_matricula, fim_matricula,
 VALUES ('P1', '2026.1', '2026-02-10', '2026-07-05', '2026-01-20', '2026-02-15', TRUE);
 
 -- Cursos Padrão
-INSERT INTO curso (codigo, nome, turno, nivel, departamento)
-VALUES ('TADS', 'Tec. em Análise e Des. de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informática');
+INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos)
+VALUES ('TADS', 'Tec. em Análise e Des. de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informática', 6);
 
-INSERT INTO curso (codigo, nome, turno, nivel, departamento)
-VALUES ('INFO-INT', 'Técnico em Informática Integrado', 'INTEGRAL', 'TECNICO_INTEGRADO', 'Informática');
+INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos)
+VALUES ('INFO-INT', 'Técnico em Informática Integrado', 'INTEGRAL', 'TECNICO_INTEGRADO', 'Informática', 8);
 
 -- Docentes Padrão
 INSERT INTO docente (matricula, nome, email, departamento)

@@ -20,8 +20,6 @@ export const Route = createFileRoute("/_app/horarios")({
 function Page() {
   const s = useStore();
   const user = useCurrentUser();
-  const periodoAtivo = s.periodos.find((p) => p.ativo) ?? s.periodos[0];
-  const [periodoId, setPeriodoId] = useState(periodoAtivo?.id ?? "");
   const cursosVisiveis = useMemo(() => {
     if (!user) return [];
     if (user.role === "coord_curso" && user.cursoId) return s.cursos.filter((c) => c.id === user.cursoId);
@@ -29,21 +27,24 @@ function Page() {
     return s.cursos;
   }, [s.cursos, user]);
   const [cursoId, setCursoId] = useState(cursosVisiveis[0]?.id ?? "");
+  const selectedCurso = useMemo(() => s.cursos.find((c) => c.id === cursoId), [s.cursos, cursoId]);
+
+  const [periodoCurso, setPeriodoCurso] = useState<number>(1);
+  const listaPeriodosCurso = useMemo(
+    () => Array.from({ length: selectedCurso?.periodos ?? 6 }, (_, i) => i + 1),
+    [selectedCurso],
+  );
+
   const [filtroTipo, setFiltroTipo] = useState<"curso" | "disciplina">("curso");
   const [filtroDisciplinaId, setFiltroDisciplinaId] = useState("");
-  const [periodoCurso, setPeriodoCurso] = useState("todos");
 
   const disciplinasCurso = useMemo(
     () => s.disciplinas.filter((d) => d.cursoId === cursoId),
     [s.disciplinas, cursoId],
   );
   const disciplinasDisponiveis = useMemo(
-    () => (periodoCurso === "todos" ? disciplinasCurso : disciplinasCurso.filter((d) => d.periodo === Number(periodoCurso))),
+    () => disciplinasCurso.filter((d) => d.periodo === periodoCurso),
     [disciplinasCurso, periodoCurso],
-  );
-  const periodosCurso = useMemo(
-    () => Array.from(new Set(disciplinasCurso.map((d) => d.periodo))).sort((a, b) => a - b),
-    [disciplinasCurso],
   );
 
   const [slot, setSlot] = useState<{ dia: number; horario: string } | null>(null);
@@ -56,28 +57,31 @@ function Page() {
     const map: Record<string, typeof s.alocacoes[number]> = {};
     s.alocacoes
       .filter((a) =>
-        a.periodoId === periodoId &&
-        (filtroTipo === "disciplina" && filtroDisciplinaId
+        filtroTipo === "disciplina" && filtroDisciplinaId
           ? a.disciplinaId === filtroDisciplinaId
-          : a.cursoId === cursoId &&
-            (periodoCurso === "todos" ||
-              s.disciplinas.find((d) => d.id === a.disciplinaId)?.periodo === Number(periodoCurso))),
+          : a.cursoId === cursoId && a.periodoCurso === periodoCurso,
       )
       .forEach((a) => { map[`${a.dia}-${a.horario}`] = a; });
     return map;
-  }, [s.alocacoes, s.disciplinas, periodoId, cursoId, filtroTipo, filtroDisciplinaId, periodoCurso]);
+  }, [s.alocacoes, cursoId, periodoCurso, filtroTipo, filtroDisciplinaId]);
 
   const conflicts = useMemo(() => {
     const set = new Set<string>();
-    const arr = s.alocacoes.filter((a) => a.periodoId === periodoId);
+    const arr = s.alocacoes;
     for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
       const a = arr[i], b = arr[j];
-      if (a.dia === b.dia && a.horario === b.horario && (a.docenteId === b.docenteId || a.ambienteId === b.ambienteId)) {
+      if (
+        a.dia === b.dia &&
+        a.horario === b.horario &&
+        (a.docenteId === b.docenteId ||
+          a.ambienteId === b.ambienteId ||
+          (a.cursoId === b.cursoId && a.periodoCurso === b.periodoCurso))
+      ) {
         set.add(a.id); set.add(b.id);
       }
     }
     return set;
-  }, [s.alocacoes, periodoId]);
+  }, [s.alocacoes]);
 
   const openSlot = (dia: number, horario: string) => {
     const existing = alocacoesGrid[`${dia}-${horario}`];
@@ -92,7 +96,7 @@ function Page() {
     if (!slot || !disciplinaId || !docenteId || !ambienteId) { toast.error("Preencha todos os campos"); return; }
     const conflictId = s.setAlocacao({
       id: editId ?? undefined,
-      disciplinaId, docenteId, ambienteId, cursoId, periodoId,
+      disciplinaId, docenteId, ambienteId, cursoId, periodoCurso,
       dia: slot.dia, horario: slot.horario,
     });
     if (conflictId) toast.warning("Atenção: choque de horário detectado!");
@@ -120,56 +124,47 @@ function Page() {
     <div>
       <PageHeader
         title="Alocar horários"
-        description="Monte o quadro do curso. Clique em uma célula ou arraste recursos (RF24, RF29, RF30)."
+        description="Monte o quadro do curso por período. Clique em uma célula ou arraste recursos (RF24, RF29, RF30)."
       />
       <Card className="p-4 mb-4">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label>Período letivo</Label>
-            <Select value={periodoId} onValueChange={setPeriodoId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{s.periodos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}{p.ativo ? " (ativo)" : ""}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Filtrar por</Label>
-            <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as "curso" | "disciplina")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="curso">Curso</SelectItem>
-                <SelectItem value="disciplina">Disciplina</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Curso</Label>
             <Combobox
               options={cursosVisiveis.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
               value={cursoId}
-              onChange={(v) => { setCursoId(v); setFiltroDisciplinaId(""); }}
+              onChange={(v) => { setCursoId(v); setFiltroDisciplinaId(""); setPeriodoCurso(1); }}
               placeholder="Buscar curso…"
             />
           </div>
-          {filtroTipo === "disciplina" ? (
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <Label>Período do curso</Label>
+            <Select value={String(periodoCurso)} onValueChange={(v) => setPeriodoCurso(Number(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {listaPeriodosCurso.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Filtrar exibição por</Label>
+            <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as "curso" | "disciplina")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="curso">Grade do Período do Curso</SelectItem>
+                <SelectItem value="disciplina">Por Disciplina Específica</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {filtroTipo === "disciplina" && (
+            <div className="space-y-2 md:col-span-3">
               <Label>Disciplina</Label>
               <Combobox
-                options={disciplinasCurso.map((d) => ({ value: d.id, label: d.nome, hint: d.codigo }))}
+                options={disciplinasCurso.map((d) => ({ value: d.id, label: `${d.codigo} · ${d.nome}`, hint: `${d.periodo}º período` }))}
                 value={filtroDisciplinaId}
                 onChange={setFiltroDisciplinaId}
                 placeholder="Buscar disciplina…"
               />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Período do curso</Label>
-              <Select value={periodoCurso} onValueChange={setPeriodoCurso}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os períodos</SelectItem>
-                  {periodosCurso.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
           )}
         </div>

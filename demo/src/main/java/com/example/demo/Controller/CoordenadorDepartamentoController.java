@@ -54,8 +54,9 @@ public class CoordenadorDepartamentoController {
             String turno = credentials.get("turno");
             String nivel = credentials.get("nivel");
             String departamento = credentials.get("departamento");
+            Integer periodos = credentials.get("periodos") != null ? Integer.parseInt(credentials.get("periodos")) : null;
 
-            coordenadorDepartamentoService.cadastrarCurso(codigo, nome, turno, nivel, departamento);
+            coordenadorDepartamentoService.cadastrarCurso(codigo, nome, turno, nivel, departamento, periodos);
             return ResponseEntity.ok("Curso cadastrado com sucesso");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
@@ -153,7 +154,8 @@ public class CoordenadorDepartamentoController {
             String matricula = map.get("codigoMatricula");
             String ambiente = map.get("codigoAmbiente");
             String turma = map.get("codigoTurma");
-            String periodo = map.get("codigoPeriodo");
+            String periodoStr = map.get("codigoPeriodo") != null ? map.get("codigoPeriodo") : map.get("periodo");
+            Integer periodo = (periodoStr != null && !periodoStr.isEmpty()) ? Integer.parseInt(periodoStr.replaceAll("\\D+", "")) : 1;
             String diaSemana = map.getOrDefault("diaSemana", "SEG");
             Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
             Time horario_fim = Time.valueOf(map.get("horarioFim"));
@@ -174,7 +176,8 @@ public class CoordenadorDepartamentoController {
             String matricula = map.get("codigoMatricula");
             String ambiente = map.get("codigoAmbiente");
             String turma = map.get("codigoTurma");
-            String periodo = map.get("codigoPeriodo");
+            String periodoStr = map.get("codigoPeriodo") != null ? map.get("codigoPeriodo") : map.get("periodo");
+            Integer periodo = (periodoStr != null && !periodoStr.isEmpty()) ? Integer.parseInt(periodoStr.replaceAll("\\D+", "")) : 1;
             String diaSemana = map.getOrDefault("diaSemana", "SEG");
             Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
             Time horario_fim = Time.valueOf(map.get("horarioFim"));
@@ -195,7 +198,8 @@ public class CoordenadorDepartamentoController {
             String matricula = map.get("codigoMatricula");
             String ambiente = map.get("codigoAmbiente");
             String turma = map.get("codigoTurma");
-            String periodo = map.get("codigoPeriodo");
+            String periodoStr = map.get("codigoPeriodo") != null ? map.get("codigoPeriodo") : map.get("periodo");
+            Integer periodo = (periodoStr != null && !periodoStr.isEmpty()) ? Integer.parseInt(periodoStr.replaceAll("\\D+", "")) : 1;
             String diaSemana = map.getOrDefault("diaSemana", "SEG");
             Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
             Time horario_fim = Time.valueOf(map.get("horarioFim"));

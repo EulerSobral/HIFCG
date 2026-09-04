@@ -31,8 +31,8 @@ public class AlocacaoHorario {
     @Column(nullable = false, length = 100)
     private String turma;
 
-    @Column(nullable = false, length = 50)
-    private String periodo;
+    @Column(nullable = false)
+    private Integer periodo;
 
     @Column(name = "dia_semana", nullable = false, length = 20)
     private String diaSemana;

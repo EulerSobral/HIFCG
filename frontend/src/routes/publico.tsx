@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/Combobox";
 import { DIAS, HORARIOS, useStore, type Alocacao } from "@/lib/store";
 import { CalendarClock, ArrowLeft } from "lucide-react";
 
@@ -13,15 +14,33 @@ export const Route = createFileRoute("/publico")({
 
 function Page() {
   const s = useStore();
-  const [periodoId, setPeriodoId] = useState(s.periodos.find((p) => p.ativo)?.id ?? s.periodos[0]?.id ?? "");
-  const [cursoId, setCursoId] = useState(s.cursos[0]?.id ?? "");
+  const [nivel, setNivel] = useState<string>("todos");
+  const cursosFiltrados = useMemo(
+    () => s.cursos.filter((c) => nivel === "todos" || c.nivel === nivel),
+    [s.cursos, nivel],
+  );
+
+  const [cursoId, setCursoId] = useState<string>(s.cursos[0]?.id ?? "");
+  const activeCursoId = useMemo(() => {
+    if (cursosFiltrados.some((c) => c.id === cursoId)) return cursoId;
+    return cursosFiltrados[0]?.id ?? "";
+  }, [cursosFiltrados, cursoId]);
+
+  const selectedCurso = useMemo(() => s.cursos.find((c) => c.id === activeCursoId), [s.cursos, activeCursoId]);
+  const [periodoCurso, setPeriodoCurso] = useState<number>(1);
+
+  const listaPeriodos = useMemo(
+    () => Array.from({ length: selectedCurso?.periodos ?? 6 }, (_, i) => i + 1),
+    [selectedCurso],
+  );
+
   const map = useMemo(() => {
     const m: Record<string, Alocacao[]> = {};
     s.alocacoes
-      .filter((a) => a.periodoId === periodoId && a.cursoId === cursoId)
+      .filter((a) => a.cursoId === activeCursoId && a.periodoCurso === periodoCurso)
       .forEach((a) => { (m[`${a.dia}-${a.horario}`] ||= []).push(a); });
     return m;
-  }, [s.alocacoes, periodoId, cursoId]);
+  }, [s.alocacoes, activeCursoId, periodoCurso]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,30 +50,50 @@ function Page() {
             <CalendarClock className="h-7 w-7" />
             <div>
               <div className="font-bold text-lg">HIFCG</div>
-              <div className="text-xs opacity-90">Consulta pública · IFPB-CG</div>
+              <div className="text-xs opacity-90">Consulta pública de horários · IFPB-CG</div>
             </div>
           </div>
           <Link to="/" className="text-sm inline-flex items-center gap-1 hover:underline"><ArrowLeft className="h-4 w-4" /> Acessar sistema</Link>
         </div>
       </header>
       <div className="max-w-5xl mx-auto p-6 space-y-4">
-        <Card className="p-4 grid md:grid-cols-2 gap-4">
+        <Card className="p-4 grid md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label>Período</Label>
-            <Select value={periodoId} onValueChange={setPeriodoId}>
+            <Label>Nível de ensino</Label>
+            <Select value={nivel} onValueChange={(v) => { setNivel(v); setPeriodoCurso(1); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{s.periodos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                <SelectItem value="todos">Todos os níveis</SelectItem>
+                <SelectItem value="Técnico Integrado">Técnico Integrado</SelectItem>
+                <SelectItem value="Técnico Subsequente">Técnico Subsequente</SelectItem>
+                <SelectItem value="Superior">Superior</SelectItem>
+                <SelectItem value="Pós-Graduação">Pós-Graduação</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Curso</Label>
-            <Select value={cursoId} onValueChange={setCursoId}>
+            <Label>Curso (Autocompletar)</Label>
+            <Combobox
+              options={cursosFiltrados.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
+              value={activeCursoId}
+              onChange={(v) => { setCursoId(v); setPeriodoCurso(1); }}
+              placeholder="Buscar curso…"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Período do curso</Label>
+            <Select value={String(periodoCurso)} onValueChange={(v) => setPeriodoCurso(Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{s.cursos.map((c) => <SelectItem key={c.id} value={c.id}>{c.codigo} · {c.nome}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {listaPeriodos.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
         </Card>
         <Card className="p-3 overflow-x-auto">
+          <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">
+            Grade de Aulas: {selectedCurso ? `${selectedCurso.nome} (${selectedCurso.codigo}) · ${periodoCurso}º Período` : "Nenhum curso selecionado"}
+          </div>
           <table className="w-full text-xs border-collapse">
             <thead><tr><th className="p-2 text-left text-muted-foreground w-28">Horário</th>{DIAS.map((d) => <th key={d} className="p-2 text-left text-muted-foreground">{d}</th>)}</tr></thead>
             <tbody>
@@ -71,7 +110,7 @@ function Page() {
                           const amb = s.ambientes.find((x) => x.id === a.ambienteId);
                           return (
                             <div key={a.id} className="rounded-md bg-primary/10 border border-primary/30 p-2 mb-1">
-                              <div className="font-semibold">{d?.nome}</div>
+                              <div className="font-semibold">{d?.nome ?? d?.codigo}</div>
                               <div className="text-muted-foreground">{doc?.nome}</div>
                               <div className="text-[10px] text-muted-foreground">{amb?.codigo}</div>
                             </div>

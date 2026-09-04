@@ -41,6 +41,7 @@ function Page() {
       nome: String(f.get("nome") || ""),
       turno, nivel,
       area: String(f.get("area") || ""),
+      periodos: Number(f.get("periodos") || 6),
     };
     if (editing) { update(editing.id, payload); toast.success("Curso atualizado"); }
     else { add(payload); toast.success("Curso cadastrado"); }
@@ -65,7 +66,7 @@ function Page() {
                   <div className="space-y-2"><Label>Área</Label><Input name="area" required defaultValue={editing?.area} /></div>
                 </div>
                 <div className="space-y-2"><Label>Nome</Label><Input name="nome" required defaultValue={editing?.nome} /></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2"><Label>Turno</Label>
                     <Select value={turno} onValueChange={(v) => setTurno(v as Curso["turno"])}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -82,6 +83,9 @@ function Page() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2"><Label>Qtd. Períodos</Label>
+                    <Input name="periodos" type="number" min={1} max={16} required defaultValue={editing?.periodos ?? 6} />
+                  </div>
                 </div>
                 <DialogFooter><Button type="submit">Salvar</Button></DialogFooter>
               </form>
@@ -96,7 +100,7 @@ function Page() {
           <datalist id="curs-list">{cursos.map((c) => <option key={c.id} value={c.nome} />)}</datalist>
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nome</TableHead><TableHead>Turno</TableHead><TableHead>Nível</TableHead><TableHead>Área</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nome</TableHead><TableHead>Turno</TableHead><TableHead>Nível</TableHead><TableHead>Qtd. Períodos</TableHead><TableHead>Área</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.map((c) => (
               <TableRow key={c.id}>
@@ -104,6 +108,7 @@ function Page() {
                 <TableCell>{c.nome}</TableCell>
                 <TableCell>{c.turno}</TableCell>
                 <TableCell>{c.nivel}</TableCell>
+                <TableCell>{c.periodos ?? 6} períodos</TableCell>
                 <TableCell>{c.area}</TableCell>
                 <TableCell className="text-right">
                   <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setTurno(c.turno); setNivel(c.nivel); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
@@ -111,7 +116,7 @@ function Page() {
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum curso.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum curso.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </Card>

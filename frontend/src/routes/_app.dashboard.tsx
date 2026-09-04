@@ -17,8 +17,13 @@ function Dashboard() {
   for (let i = 0; i < s.alocacoes.length; i++) {
     for (let j = i + 1; j < s.alocacoes.length; j++) {
       const a = s.alocacoes[i], b = s.alocacoes[j];
-      if (a.periodoId === b.periodoId && a.dia === b.dia && a.horario === b.horario &&
-          (a.docenteId === b.docenteId || a.ambienteId === b.ambienteId || a.cursoId === b.cursoId)) {
+      if (
+        a.dia === b.dia &&
+        a.horario === b.horario &&
+        (a.docenteId === b.docenteId ||
+          a.ambienteId === b.ambienteId ||
+          (a.cursoId === b.cursoId && a.periodoCurso === b.periodoCurso))
+      ) {
         conflicts.push(`${a.id}-${b.id}`);
       }
     }

@@ -37,6 +37,18 @@ function Page() {
   const [checkCursoId, setCheckCursoId] = useState(cursos[0]?.id ?? "");
   const [checkPeriodo, setCheckPeriodo] = useState("1");
 
+  const selectedCursoObj = useMemo(() => cursos.find((c) => c.id === cursoId), [cursos, cursoId]);
+  const formPeriodos = useMemo(
+    () => Array.from({ length: selectedCursoObj?.periodos ?? 8 }, (_, i) => i + 1),
+    [selectedCursoObj],
+  );
+
+  const selectedCheckCursoObj = useMemo(() => cursos.find((c) => c.id === checkCursoId), [cursos, checkCursoId]);
+  const checkPeriodosList = useMemo(
+    () => Array.from({ length: selectedCheckCursoObj?.periodos ?? 8 }, (_, i) => i + 1),
+    [selectedCheckCursoObj],
+  );
+
   const filtered = useMemo(
     () => disciplinas.filter((d) => `${d.codigo} ${d.nome}`.toLowerCase().includes(q.toLowerCase())),
     [disciplinas, q],
@@ -95,7 +107,7 @@ function Page() {
                   <div className="space-y-2"><Label>Período do curso</Label>
                     <Select value={periodo} onValueChange={setPeriodo}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{PERIODOS_CURSO.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}</SelectContent>
+                      <SelectContent>{formPeriodos.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
@@ -148,7 +160,7 @@ function Page() {
             <Label>Período do curso</Label>
             <Select value={checkPeriodo} onValueChange={setCheckPeriodo}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{PERIODOS_CURSO.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}</SelectContent>
+              <SelectContent>{checkPeriodosList.map((p) => <SelectItem key={p} value={String(p)}>{p}º período</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>

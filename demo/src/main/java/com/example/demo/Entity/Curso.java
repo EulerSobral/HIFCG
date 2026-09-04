@@ -29,4 +29,7 @@ public class Curso {
 
     @Column(nullable = false, length = 100)
     private String departamento;
+
+    @Column(name = "periodos")
+    private Integer periodos;
 }
