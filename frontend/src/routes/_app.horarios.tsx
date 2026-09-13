@@ -1,5 +1,5 @@
+import React, { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/Combobox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useStore, DIAS, HORARIOS, useCurrentUser } from "@/lib/store";
+import { ResourceDetailsModal } from "@/components/ResourceDetailsModal";
+import { useStore, DIAS, SLOTS_HORARIOS, getTurnosParaCurso, useCurrentUser } from "@/lib/store";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,10 @@ function Page() {
   const [disciplinaId, setDisciplinaId] = useState("");
   const [docenteId, setDocenteId] = useState("");
   const [ambienteId, setAmbienteId] = useState("");
+
+  // Estado para os modais interativos de Docente e Ambiente
+  const [detailsDocenteId, setDetailsDocenteId] = useState<string | null>(null);
+  const [detailsAmbienteId, setDetailsAmbienteId] = useState<string | null>(null);
 
   const alocacoesGrid = useMemo(() => {
     const map: Record<string, typeof s.alocacoes[number]> = {};
@@ -120,18 +125,21 @@ function Page() {
     if (type === "ambiente") setAmbienteId(id);
   };
 
+  // Turnos visíveis com base na modalidade do curso (ex.: Integral omite Noturno; Noturno omite Manhã e Tarde)
+  const turnosVisiveis = useMemo(() => getTurnosParaCurso(selectedCurso?.turno), [selectedCurso]);
+
   return (
     <div>
       <PageHeader
         title="Alocar horários"
-        description="Monte o quadro do curso por período. Clique em uma célula ou arraste recursos (RF24, RF29, RF30)."
+        description="Monte o quadro do curso por período. Clique em uma célula para alocar ou nos nomes de docente/ambiente para ver detalhes."
       />
       <Card className="p-4 mb-4">
         <div className="grid md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Curso</Label>
             <Combobox
-              options={cursosVisiveis.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
+              options={cursosVisiveis.map((c) => ({ value: c.id, label: c.nome, hint: `${c.codigo} (${c.turno})` }))}
               value={cursoId}
               onChange={(v) => { setCursoId(v); setFiltroDisciplinaId(""); setPeriodoCurso(1); }}
               placeholder="Buscar curso…"
@@ -175,54 +183,95 @@ function Page() {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr>
-                <th className="p-2 text-left text-muted-foreground font-medium w-28">Horário</th>
+                <th className="p-2 text-left text-muted-foreground font-medium w-32">Horário (50 min)</th>
                 {DIAS.map((d) => <th key={d} className="p-2 text-left text-muted-foreground font-medium">{d}</th>)}
               </tr>
             </thead>
             <tbody>
-              {HORARIOS.map((h) => (
-                <tr key={h}>
-                  <td className="p-2 align-top font-mono text-muted-foreground border-t">{h}</td>
-                  {DIAS.map((_, di) => {
-                    const a = alocacoesGrid[`${di}-${h}`];
-                    const isConflict = a && conflicts.has(a.id);
-                    const disc = a && s.disciplinas.find((x) => x.id === a.disciplinaId);
-                    const doc = a && s.docentes.find((x) => x.id === a.docenteId);
-                    const amb = a && s.ambientes.find((x) => x.id === a.ambienteId);
-                    return (
-                      <td key={di} className="p-1 align-top border-t">
-                        <button
-                          type="button"
-                          onClick={() => openSlot(di, h)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => onDrop(e, di, h)}
-                          className={cn(
-                            "w-full min-h-[68px] rounded-md text-left p-2 transition-colors border",
-                            a
-                              ? isConflict
-                                ? "bg-destructive/15 border-destructive/40 hover:bg-destructive/25"
-                                : "bg-primary/10 border-primary/30 hover:bg-primary/15"
-                              : "border-dashed border-border hover:bg-muted",
-                          )}
-                        >
-                          {a ? (
-                            <div className="space-y-0.5">
-                              <div className="font-semibold text-foreground flex items-center gap-1">
-                                {isConflict && <AlertTriangle className="h-3 w-3 text-destructive" />}
-                                {disc?.codigo}
-                              </div>
-                              <div className="text-muted-foreground truncate">{doc?.nome}</div>
-                              <div className="text-[10px] text-muted-foreground">{amb?.codigo}</div>
-                            </div>
-                          ) : (
-                            <div className="text-muted-foreground flex items-center justify-center h-full opacity-50"><Plus className="h-4 w-4" /></div>
-                          )}
-                        </button>
+              {turnosVisiveis.map((turno) => {
+                const slotsDoTurno = SLOTS_HORARIOS.filter((s) => s.turno === turno);
+                return (
+                  <React.Fragment key={turno}>
+                    <tr className="bg-muted/40 border-t border-b">
+                      <td colSpan={7} className="px-2 py-1.5 text-[11px] font-bold text-primary tracking-wide uppercase">
+                        Turno {turno} ({slotsDoTurno.length} aulas)
                       </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    </tr>
+                    {slotsDoTurno.map((slotObj) => {
+                      const h = slotObj.horario;
+                      return (
+                        <tr key={slotObj.id}>
+                          <td className="p-2 align-top border-t bg-muted/10">
+                            <div className="font-semibold text-foreground text-xs">{slotObj.code}</div>
+                            <div className="font-mono text-[10px] text-muted-foreground">{h}</div>
+                          </td>
+                          {DIAS.map((_, di) => {
+                            const a = alocacoesGrid[`${di}-${h}`];
+                            const isConflict = a && conflicts.has(a.id);
+                            const disc = a && s.disciplinas.find((x) => x.id === a.disciplinaId);
+                            const doc = a && s.docentes.find((x) => x.id === a.docenteId);
+                            const amb = a && s.ambientes.find((x) => x.id === a.ambienteId);
+                            return (
+                              <td key={di} className="p-1 align-top border-t">
+                                <div
+                                  onClick={() => openSlot(di, h)}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => onDrop(e, di, h)}
+                                  className={cn(
+                                    "w-full min-h-[72px] rounded-md text-left p-2 transition-colors border cursor-pointer select-none",
+                                    a
+                                      ? isConflict
+                                        ? "bg-destructive/15 border-destructive/40 hover:bg-destructive/25"
+                                        : "bg-primary/10 border-primary/30 hover:bg-primary/15"
+                                      : "border-dashed border-border hover:bg-muted",
+                                  )}
+                                >
+                                  {a ? (
+                                    <div className="space-y-0.5">
+                                      <div className="font-semibold text-foreground flex items-center gap-1">
+                                        {isConflict && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
+                                        <span className="truncate">{disc?.codigo}</span>
+                                      </div>
+                                      <div>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (doc?.id) setDetailsDocenteId(doc.id);
+                                          }}
+                                          className="text-primary hover:underline font-medium text-left truncate block w-full cursor-pointer text-xs"
+                                          title="Ver dados e agenda do docente"
+                                        >
+                                          {doc?.nome || "Docente"}
+                                        </button>
+                                      </div>
+                                      <div>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (amb?.id) setDetailsAmbienteId(amb.id);
+                                          }}
+                                          className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold hover:underline text-left truncate block w-full cursor-pointer"
+                                          title="Ver detalhes do ambiente"
+                                        >
+                                          {amb?.codigo || "Ambiente"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-muted-foreground flex items-center justify-center h-full opacity-50 py-3"><Plus className="h-4 w-4" /></div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </Card>
@@ -243,6 +292,17 @@ function Page() {
         </Card>
       </div>
 
+      {/* Modal de Detalhes Interativos (Docente / Ambiente) */}
+      <ResourceDetailsModal
+        docenteId={detailsDocenteId}
+        ambienteId={detailsAmbienteId}
+        onClose={() => {
+          setDetailsDocenteId(null);
+          setDetailsAmbienteId(null);
+        }}
+      />
+
+      {/* Modal de Alocação de Slot */}
       <Dialog open={!!slot} onOpenChange={(o) => { if (!o) { setSlot(null); setEditId(null); } }}>
         <DialogContent>
           <DialogHeader>

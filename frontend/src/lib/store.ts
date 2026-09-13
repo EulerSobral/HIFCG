@@ -412,8 +412,8 @@ export const useStore = create<State>()(
       },
     }),
     {
-      name: "hifcg-store-v6",
-      version: 6,
+      name: "hifcg-store-v7",
+      version: 7,
       migrate: (persisted) => {
         const s = persisted as Partial<State> | undefined;
         const cursos = (s?.cursos ?? seedCursos).map((c) => ({ ...c, periodos: c.periodos ?? 6 }));
@@ -430,16 +430,48 @@ export const useCurrentUser = () => {
   return users.find((u) => u.id === id) ?? null;
 };
 
-export const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-export const HORARIOS = [
-  "07:00-08:40",
-  "08:50-10:30",
-  "10:40-12:20",
-  "13:30-15:10",
-  "15:20-17:00",
-  "19:00-20:40",
-  "20:50-22:30",
+export interface HorarioSlot {
+  id: string;
+  code: string;
+  turno: "Manhã" | "Tarde" | "Noite";
+  horario: string;
+}
+
+export const SLOTS_HORARIOS: HorarioSlot[] = [
+  // Manhã (6 linhas de 50min)
+  { id: "m1", code: "M1", turno: "Manhã", horario: "07:00-07:50" },
+  { id: "m2", code: "M2", turno: "Manhã", horario: "07:50-08:40" },
+  { id: "m3", code: "M3", turno: "Manhã", horario: "08:50-09:40" },
+  { id: "m4", code: "M4", turno: "Manhã", horario: "09:40-10:30" },
+  { id: "m5", code: "M5", turno: "Manhã", horario: "10:40-11:30" },
+  { id: "m6", code: "M6", turno: "Manhã", horario: "11:30-12:20" },
+
+  // Tarde (6 linhas de 50min)
+  { id: "t1", code: "T1", turno: "Tarde", horario: "13:00-13:50" },
+  { id: "t2", code: "T2", turno: "Tarde", horario: "13:50-14:40" },
+  { id: "t3", code: "T3", turno: "Tarde", horario: "14:50-15:40" },
+  { id: "t4", code: "T4", turno: "Tarde", horario: "15:40-16:30" },
+  { id: "t5", code: "T5", turno: "Tarde", horario: "16:40-17:30" },
+  { id: "t6", code: "T6", turno: "Tarde", horario: "17:30-18:20" },
+
+  // Noite (4 linhas de 50min)
+  { id: "n1", code: "N1", turno: "Noite", horario: "18:50-19:40" },
+  { id: "n2", code: "N2", turno: "Noite", horario: "19:40-20:30" },
+  { id: "n3", code: "N3", turno: "Noite", horario: "20:40-21:30" },
+  { id: "n4", code: "N4", turno: "Noite", horario: "21:30-22:20" },
 ];
+
+export const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+export const HORARIOS = SLOTS_HORARIOS.map((s) => s.horario);
+
+export const getTurnosParaCurso = (turnoCurso?: string): Array<"Manhã" | "Tarde" | "Noite"> => {
+  if (!turnoCurso) return ["Manhã", "Tarde", "Noite"];
+  if (turnoCurso === "Integral") return ["Manhã", "Tarde"];
+  if (turnoCurso === "Matutino") return ["Manhã"];
+  if (turnoCurso === "Vespertino") return ["Tarde"];
+  if (turnoCurso === "Noturno") return ["Noite"];
+  return ["Manhã", "Tarde", "Noite"];
+};
 
 export const roleLabel = (r: Role) =>
   r === "diretor" ? "Diretor do Campus" : r === "coord_area" ? "Coordenador de Área" : "Coordenador de Curso";
