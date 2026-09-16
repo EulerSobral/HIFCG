@@ -68,22 +68,24 @@ function Dashboard() {
           </Link>
         ))}
       </div>
-      <div className="grid md:grid-cols-2 gap-4 mt-8">
-        <Card>
-          <CardHeader><CardTitle>Atividade recente</CardTitle><CardDescription>Últimas ações registradas.</CardDescription></CardHeader>
-          <CardContent className="space-y-2 text-sm max-h-72 overflow-y-auto">
-            {s.logs.length === 0 && <p className="text-muted-foreground">Nenhuma atividade ainda.</p>}
-            {s.logs.slice(0, 10).map((l) => (
-              <div key={l.id} className="flex justify-between gap-3 py-1 border-b last:border-0">
-                <div>
-                  <div className="font-medium">{l.acao}</div>
-                  <div className="text-xs text-muted-foreground">{l.userName} · {l.detalhe}</div>
+      <div className={`grid gap-4 mt-8 ${user?.role !== "coord_curso" ? "md:grid-cols-2" : "grid-cols-1"}`}>
+        {user?.role !== "coord_curso" && (
+          <Card>
+            <CardHeader><CardTitle>Atividade recente</CardTitle><CardDescription>Últimas ações registradas.</CardDescription></CardHeader>
+            <CardContent className="space-y-2 text-sm max-h-72 overflow-y-auto">
+              {s.logs.length === 0 && <p className="text-muted-foreground">Nenhuma atividade ainda.</p>}
+              {s.logs.slice(0, 10).map((l) => (
+                <div key={l.id} className="flex justify-between gap-3 py-1 border-b last:border-0">
+                  <div>
+                    <div className="font-medium">{l.acao}</div>
+                    <div className="text-xs text-muted-foreground">{l.userName} · {l.detalhe}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.timestamp).toLocaleString("pt-BR")}</div>
                 </div>
-                <div className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.timestamp).toLocaleString("pt-BR")}</div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader><CardTitle>Período ativo</CardTitle><CardDescription>Período corrente de alocação.</CardDescription></CardHeader>
           <CardContent className="text-sm">

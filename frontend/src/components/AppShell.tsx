@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 const nav = [
   { to: "/dashboard", label: "Painel", icon: LayoutDashboard, roles: ["diretor", "coord_area", "coord_curso"] as const },
   { to: "/docentes", label: "Docentes", icon: Users, roles: ["diretor", "coord_area", "coord_curso"] as const },
-  { to: "/ambientes", label: "Ambientes", icon: Building2, roles: ["diretor", "coord_area"] as const },
+  { to: "/ambientes", label: "Ambientes", icon: Building2, roles: ["diretor", "coord_area", "coord_curso"] as const },
   { to: "/cursos", label: "Cursos", icon: GraduationCap, roles: ["diretor", "coord_area"] as const },
   { to: "/disciplinas", label: "Disciplinas", icon: BookOpen, roles: ["diretor", "coord_area", "coord_curso"] as const },
   { to: "/periodos", label: "Períodos Letivos", icon: CalendarRange, roles: ["diretor", "coord_area"] as const },

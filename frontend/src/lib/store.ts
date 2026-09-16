@@ -461,7 +461,7 @@ export const SLOTS_HORARIOS: HorarioSlot[] = [
   { id: "n4", code: "N4", turno: "Noite", horario: "21:30-22:20" },
 ];
 
-export const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+export const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 export const HORARIOS = SLOTS_HORARIOS.map((s) => s.horario);
 
 export const getTurnosParaCurso = (turnoCurso?: string): Array<"Manhã" | "Tarde" | "Noite"> => {

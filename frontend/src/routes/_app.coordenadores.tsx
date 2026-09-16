@@ -23,9 +23,11 @@ function Page() {
   const users = useStore((s) => s.users);
   const cursos = useStore((s) => s.cursos);
   const addUser = useStore((s) => s.addUser);
+  const updateUser = useStore((s) => s.updateUser);
   const removeUser = useStore((s) => s.removeUser);
   const setUserPassword = useStore((s) => s.setUserPassword);
   const [open, setOpen] = useState(false);
+  const [openSelfEdit, setOpenSelfEdit] = useState(false);
   const [role, setRole] = useState<Role>("coord_curso");
   const [cursoId, setCursoId] = useState(cursos[0]?.id ?? "");
 
@@ -33,8 +35,6 @@ function Page() {
     me?.role === "diretor"
       ? ["coord_area", "coord_curso"]
       : me?.role === "coord_area"
-      ? ["coord_curso"]
-      : me?.role === "coord_curso"
       ? ["coord_curso"]
       : [];
 
@@ -53,6 +53,24 @@ function Page() {
     setOpen(false);
   };
 
+  const submitSelfEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!me) return;
+    const f = new FormData(e.currentTarget);
+    const nome = String(f.get("nome") || "").trim();
+    const email = String(f.get("email") || "").trim();
+    const novaSenha = String(f.get("senha") || "").trim();
+
+    if (nome && email) {
+      updateUser(me.id, { nome, email });
+    }
+    if (novaSenha) {
+      await setUserPassword(me.id, novaSenha);
+    }
+    toast.success("Credenciais alteradas com sucesso");
+    setOpenSelfEdit(false);
+  };
+
   const resetPassword = async (u: User) => {
     const nova = prompt(`Nova senha para ${u.nome}`, "123456");
     if (nova) { await setUserPassword(u.id, nova); toast.success("Senha redefinida"); }
@@ -61,61 +79,160 @@ function Page() {
   return (
     <div>
       <PageHeader
-        title="Coordenadores e senhas root"
-        description="Diretor cria coord. de área e curso. Coord. de área cria coord. de curso (RF31-RF33, RF38)."
+        title="Coordenadores e credenciais"
+        description="Gerenciamento de contas de coordenadores e credenciais de acesso."
         action={
-          allowedToCreate.length > 0 && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Novo coordenador</Button></DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Dialog open={openSelfEdit} onOpenChange={setOpenSelfEdit}>
+              <DialogTrigger asChild>
+                <Button variant={allowedToCreate.length === 0 ? "default" : "outline"}>
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Alterar minhas credenciais
+                </Button>
+              </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Cadastrar coordenador</DialogTitle></DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
-                  <div className="space-y-2"><Label>Nome</Label><Input name="nome" required /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>E-mail</Label><Input type="email" name="email" required /></div>
-                    <div className="space-y-2"><Label>Senha root</Label><Input name="senha" defaultValue="123456" required /></div>
+                <DialogHeader>
+                  <DialogTitle>Alterar minhas credenciais</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={submitSelfEdit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input name="nome" required defaultValue={me?.nome} />
                   </div>
-                  <div className="space-y-2"><Label>Tipo de perfil</Label>
-                    <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{allowedToCreate.map((r) => <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>)}</SelectContent>
-                    </Select>
+                  <div className="space-y-2">
+                    <Label>E-mail</Label>
+                    <Input type="email" name="email" required defaultValue={me?.email} />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>Área</Label><Input name="area" defaultValue={me?.area ?? ""} /></div>
-                    {role === "coord_curso" && (
-                      <div className="space-y-2"><Label>Curso</Label>
-                        <Combobox
-                          options={cursos.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
-                          value={cursoId}
-                          onChange={setCursoId}
-                          placeholder="Buscar curso…"
-                        />
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label>Nova senha (opcional)</Label>
+                    <Input type="password" name="senha" placeholder="Deixe em branco para não alterar" />
                   </div>
-                  <DialogFooter><Button type="submit">Cadastrar</Button></DialogFooter>
+                  <DialogFooter>
+                    <Button type="submit">Salvar credenciais</Button>
+                  </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
-          )
+
+            {allowedToCreate.length > 0 && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo coordenador
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Cadastrar coordenador</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={submit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Nome</Label>
+                      <Input name="nome" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>E-mail</Label>
+                        <Input type="email" name="email" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Senha root</Label>
+                        <Input name="senha" defaultValue="123456" required />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo de perfil</Label>
+                      <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allowedToCreate.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {roleLabel(r)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Área</Label>
+                        <Input name="area" defaultValue={me?.area ?? ""} />
+                      </div>
+                      {role === "coord_curso" && (
+                        <div className="space-y-2">
+                          <Label>Curso</Label>
+                          <Combobox
+                            options={cursos.map((c) => ({ value: c.id, label: c.nome, hint: c.codigo }))}
+                            value={cursoId}
+                            onChange={setCursoId}
+                            placeholder="Buscar curso…"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Cadastrar</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         }
       />
       <Card className="p-4">
         <Table>
-          <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>E-mail</TableHead><TableHead>Perfil</TableHead><TableHead>Área</TableHead><TableHead>Curso</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>E-mail</TableHead>
+              <TableHead>Perfil</TableHead>
+              <TableHead>Área</TableHead>
+              <TableHead>Curso</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {users.map((u) => (
               <TableRow key={u.id}>
-                <TableCell className="font-medium flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" />{u.nome}</TableCell>
+                <TableCell className="font-medium flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  {u.nome}
+                </TableCell>
                 <TableCell className="text-muted-foreground">{u.email}</TableCell>
                 <TableCell>{roleLabel(u.role)}</TableCell>
                 <TableCell>{u.area ?? "—"}</TableCell>
                 <TableCell>{cursos.find((c) => c.id === u.cursoId)?.nome ?? "—"}</TableCell>
                 <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => resetPassword(u)}><KeyRound className="h-4 w-4 mr-1" />Senha</Button>
-                  {me?.role === "diretor" && u.id !== me.id && (
-                    <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Remover ${u.nome}?`)) { removeUser(u.id); toast.success("Removido"); } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  {u.id === me?.id ? (
+                    <Button size="sm" variant="ghost" onClick={() => setOpenSelfEdit(true)}>
+                      <KeyRound className="h-4 w-4 mr-1" />
+                      Minhas credenciais
+                    </Button>
+                  ) : (
+                    (me?.role === "diretor" || (me?.role === "coord_area" && u.role === "coord_curso")) && (
+                      <Button size="sm" variant="ghost" onClick={() => resetPassword(u)}>
+                        <KeyRound className="h-4 w-4 mr-1" />
+                        Senha
+                      </Button>
+                    )
+                  )}
+                  {me?.role === "diretor" && u.id !== me?.id && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm(`Remover ${u.nome}?`)) {
+                          removeUser(u.id);
+                          toast.success("Removido");
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>
