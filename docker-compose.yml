@@ -1,0 +1,56 @@
+services:
+  postgres:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: hifcg-postgres:latest
+    container_name: hifcg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hifcgdb}
+      POSTGRES_USER: ${POSTGRES_USER:-hifcg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hifcg} -d ${POSTGRES_DB:-hifcgdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./demo
+      dockerfile: Dockerfile
+    image: hifcg-backend:latest
+    container_name: hifcg-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-hifcgdb}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-hifcg}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: hifcg-frontend:latest
+    container_name: hifcg-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

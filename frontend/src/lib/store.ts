@@ -14,6 +14,8 @@ import {
   removePeriodoApi,
   addCoordenadorApi,
   removeCoordenadorApi,
+  addAlocacaoApi,
+  removeAlocacaoApi,
   addLogApi,
 } from "./api";
 
@@ -167,6 +169,14 @@ const safeEqual = (a: string, b: string) => {
   return diff === 0;
 };
 
+const DIA_CODES = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+
+const toBackendHorario = (horario: string): { inicio: string; fim: string } => {
+  const [ini = "08:00", fim = "09:40"] = horario.split("-");
+  const fmt = (t: string) => (t.trim().length === 5 ? `${t.trim()}:00` : t.trim());
+  return { inicio: fmt(ini), fim: fmt(fim) };
+};
+
 const seedUsers: User[] = [
   { id: "u1", nome: "Dr. Roberto Lima", email: "diretor@ifpb.edu.br", salt: "s1", senhaHash: "2bb2196139a152d838a22cc4e4b8fc3b425ad36bed7e5576821fdbd558f12103", role: "diretor" },
   { id: "u2", nome: "Profa. Ana Souza", email: "area.info@ifpb.edu.br", salt: "s2", senhaHash: "6dfc787627f2d560d2a6bc4c370aeb916577fc0fc006c6b2249207977d5d02ed", role: "coord_area", area: "Informática" },
@@ -218,13 +228,14 @@ export const useStore = create<State>()(
       logs: [],
 
       login: async (email, senha) => {
-        // Tenta autenticação no backend Spring Boot primeiro
+        // Tenta autenticação no backend Spring Boot / PostgreSQL primeiro
         const backendUser = await loginApi(email, senha);
         if (backendUser) {
           let userInStore = get().users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
           if (!userInStore) {
             const salt = randomSalt();
             const senhaHash = await hashSenha(salt, senha);
+            const matchedCurso = get().cursos.find((c) => c.codigo === backendUser.cursoId || c.id === backendUser.cursoId);
             userInStore = {
               id: backendUser.id || uid(),
               nome: backendUser.nome,
@@ -233,12 +244,12 @@ export const useStore = create<State>()(
               senhaHash,
               role: backendUser.role as Role,
               area: backendUser.area,
-              cursoId: backendUser.cursoId,
+              cursoId: matchedCurso ? matchedCurso.id : backendUser.cursoId,
             };
             set((s) => ({ users: [...s.users, userInStore!] }));
           }
           set({ currentUserId: userInStore.id });
-          get().addLog("login", `Usuário ${userInStore.nome} acessou o sistema via backend`);
+          get().addLog("login", `Usuário ${userInStore.nome} acessou o sistema via PostgreSQL`);
           return userInStore;
         }
 
@@ -326,13 +337,17 @@ export const useStore = create<State>()(
       addDisciplina: (d) => {
         const id = uid();
         set((s) => ({ disciplinas: [...s.disciplinas, { ...d, id }] }));
-        addDisciplinaApi({ codigo: d.codigo, nome: d.nome, cargaHoraria: d.cargaHoraria, curso: d.cursoId });
+        const cursoCodigo = get().cursos.find((c) => c.id === d.cursoId)?.codigo || d.cursoId;
+        addDisciplinaApi({ codigo: d.codigo, nome: d.nome, cargaHoraria: d.cargaHoraria, curso: cursoCodigo });
         get().addLog("disciplina.criar", d.nome);
       },
       updateDisciplina: (id, d) => {
         set((s) => ({ disciplinas: s.disciplinas.map((x) => (x.id === id ? { ...x, ...d } : x)) }));
         const target = get().disciplinas.find((x) => x.id === id);
-        if (target) addDisciplinaApi({ codigo: target.codigo, nome: target.nome, cargaHoraria: target.cargaHoraria, curso: target.cursoId });
+        if (target) {
+          const cursoCodigo = get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId;
+          addDisciplinaApi({ codigo: target.codigo, nome: target.nome, cargaHoraria: target.cargaHoraria, curso: cursoCodigo });
+        }
         get().addLog("disciplina.editar", id);
       },
       removeDisciplina: (id) => {
@@ -362,20 +377,32 @@ export const useStore = create<State>()(
       },
 
       addUser: async ({ senha, ...u }) => {
+        const id = uid();
         const salt = randomSalt();
         const senhaHash = await hashSenha(salt, senha);
-        set((s) => ({ users: [...s.users, { ...u, id: uid(), salt, senhaHash }] }));
-        addCoordenadorApi({ nome: u.nome, email: u.email, senha, role: u.role, area: u.area, cursoId: u.cursoId });
+        set((s) => ({ users: [...s.users, { ...u, id, salt, senhaHash }] }));
+        const cursoCodigo = u.cursoId ? get().cursos.find((c) => c.id === u.cursoId)?.codigo || u.cursoId : undefined;
+        addCoordenadorApi({ matricula: id, nome: u.nome, email: u.email, senha, role: u.role, area: u.area, cursoId: cursoCodigo });
         get().addLog("usuario.criar", u.nome);
       },
       updateUser: (id, u) => {
         set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, ...u } : x)) }));
+        const target = get().users.find((x) => x.id === id);
+        if (target) {
+          const cursoCodigo = target.cursoId ? get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId : undefined;
+          addCoordenadorApi({ matricula: target.id, nome: target.nome, email: target.email, role: target.role, area: target.area, cursoId: cursoCodigo });
+        }
         get().addLog("usuario.editar", id);
       },
       setUserPassword: async (id, senha) => {
         const salt = randomSalt();
         const senhaHash = await hashSenha(salt, senha);
         set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, salt, senhaHash } : x)) }));
+        const target = get().users.find((x) => x.id === id);
+        if (target) {
+          const cursoCodigo = target.cursoId ? get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId : undefined;
+          addCoordenadorApi({ matricula: target.id, nome: target.nome, email: target.email, senha, role: target.role, area: target.area, cursoId: cursoCodigo });
+        }
         get().addLog("usuario.senha", id);
       },
       removeUser: (id) => {
@@ -403,10 +430,47 @@ export const useStore = create<State>()(
             alocacoes: exists ? s.alocacoes.map((x) => (x.id === id ? next : x)) : [...s.alocacoes, next],
           };
         });
+
+        const disc = get().disciplinas.find((d) => d.id === a.disciplinaId)?.codigo || a.disciplinaId;
+        const doc = get().docentes.find((d) => d.id === a.docenteId)?.matricula || a.docenteId;
+        const amb = get().ambientes.find((am) => am.id === a.ambienteId)?.codigo || a.ambienteId;
+        const curso = get().cursos.find((c) => c.id === a.cursoId)?.codigo || a.cursoId;
+        const { inicio, fim } = toBackendHorario(a.horario);
+
+        addAlocacaoApi({
+          disciplina: disc,
+          docente: doc,
+          ambiente: amb,
+          turma: curso,
+          periodo: a.periodoCurso,
+          diaSemana: DIA_CODES[a.dia] || "SEG",
+          horarioInicio: inicio,
+          horarioFim: fim,
+        });
+
         get().addLog("alocacao.salvar", `${a.dia}/${a.horario}`);
         return conflict ? conflict.id : null;
       },
       removeAlocacao: (id) => {
+        const target = get().alocacoes.find((x) => x.id === id);
+        if (target) {
+          const disc = get().disciplinas.find((d) => d.id === target.disciplinaId)?.codigo || target.disciplinaId;
+          const doc = get().docentes.find((d) => d.id === target.docenteId)?.matricula || target.docenteId;
+          const amb = get().ambientes.find((am) => am.id === target.ambienteId)?.codigo || target.ambienteId;
+          const curso = get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId;
+          const { inicio, fim } = toBackendHorario(target.horario);
+
+          removeAlocacaoApi({
+            disciplina: disc,
+            docente: doc,
+            ambiente: amb,
+            turma: curso,
+            periodo: target.periodoCurso,
+            diaSemana: DIA_CODES[target.dia] || "SEG",
+            horarioInicio: inicio,
+            horarioFim: fim,
+          });
+        }
         set((s) => ({ alocacoes: s.alocacoes.filter((x) => x.id !== id) }));
         get().addLog("alocacao.remover", id);
       },

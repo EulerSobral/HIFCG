@@ -1,4 +1,6 @@
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) ||
+  "http://localhost:8080";
 
 export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000): Promise<Response> {
   const controller = new AbortController();
@@ -189,6 +191,55 @@ export async function addCoordenadorApi(c: any) {
 export async function removeCoordenadorApi(matricula: string) {
   try {
     await fetchWithTimeout(`${API_BASE_URL}/api/coordenadores/${matricula}`, { method: "DELETE" });
+  } catch {}
+}
+
+// ALOCACOES
+export async function fetchAlocacoesApi() {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/alocacoes`);
+    if (res.ok) return await res.json();
+  } catch {}
+  return null;
+}
+
+export async function addAlocacaoApi(a: {
+  disciplina: string;
+  docente: string;
+  ambiente: string;
+  turma: string;
+  periodo: string | number;
+  diaSemana: string;
+  horarioInicio: string;
+  horarioFim: string;
+}) {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/alocacoes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(a),
+    });
+    if (res.ok) return await res.text();
+  } catch {}
+  return null;
+}
+
+export async function removeAlocacaoApi(a: {
+  disciplina: string;
+  docente: string;
+  ambiente: string;
+  turma: string;
+  periodo: string | number;
+  diaSemana: string;
+  horarioInicio: string;
+  horarioFim: string;
+}) {
+  try {
+    await fetchWithTimeout(`${API_BASE_URL}/api/alocacoes`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(a),
+    });
   } catch {}
 }
 

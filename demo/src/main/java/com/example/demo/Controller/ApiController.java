@@ -104,17 +104,34 @@ public class ApiController {
         try {
             String roleStr = body.get("role");
             String tipo = "CURSO";
-            if ("diretor".equalsIgnoreCase(roleStr)) tipo = "DIRETOR";
-            else if ("coord_area".equalsIgnoreCase(roleStr)) tipo = "AREA_DEPARTAMENTO";
+            if ("diretor".equalsIgnoreCase(roleStr) || "DIRETOR".equalsIgnoreCase(roleStr)) tipo = "DIRETOR";
+            else if ("coord_area".equalsIgnoreCase(roleStr) || "AREA_DEPARTAMENTO".equalsIgnoreCase(roleStr)) tipo = "AREA_DEPARTAMENTO";
+
+            String matricula = body.get("matricula") != null && !body.get("matricula").isEmpty()
+                    ? body.get("matricula")
+                    : (body.get("id") != null && !body.get("id").isEmpty() ? body.get("id") : "U" + System.currentTimeMillis() % 100000);
+
+            Optional<Coordenador> existing = coordenadorRepository.findCoordenadorByMatricula(matricula);
+            if (existing.isEmpty() && body.get("email") != null) {
+                existing = coordenadorRepository.findByEmailObject(body.get("email"));
+                if (existing.isPresent()) {
+                    matricula = existing.get().getMatricula();
+                }
+            }
+
+            String senha = body.get("senha");
+            if (senha == null || senha.isEmpty()) {
+                senha = existing.map(Coordenador::getSenha).orElse("123456");
+            }
 
             Coordenador c = Coordenador.builder()
-                    .matricula("U" + System.currentTimeMillis() % 100000)
-                    .nome(body.get("nome"))
-                    .email(body.get("email"))
-                    .senha(body.get("senha") != null ? body.get("senha") : "123456")
+                    .matricula(matricula)
+                    .nome(body.get("nome") != null ? body.get("nome") : existing.map(Coordenador::getNome).orElse("Coordenador"))
+                    .email(body.get("email") != null ? body.get("email") : existing.map(Coordenador::getEmail).orElse(""))
+                    .senha(senha)
                     .tipoCoordenador(tipo)
-                    .departamento(body.get("area"))
-                    .cursoCodigo(body.get("cursoId"))
+                    .departamento(body.get("area") != null ? body.get("area") : body.get("departamento"))
+                    .cursoCodigo(body.get("cursoId") != null ? body.get("cursoId") : body.get("cursoCodigo"))
                     .build();
             coordenadorRepository.save(c);
             return ResponseEntity.ok(c);
@@ -299,6 +316,36 @@ public class ApiController {
 
             alocacaoHorarioRepository.alocarHorario(disc, doc, amb, turma, per, dia, hIni, hFim);
             return ResponseEntity.ok("Alocação realizada com sucesso");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @DeleteMapping("/alocacoes/{id}")
+    public ResponseEntity<?> removeAlocacaoById(@PathVariable Long id) {
+        try {
+            alocacaoHorarioRepository.deleteById(id);
+            return ResponseEntity.ok("Alocação removida");
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @DeleteMapping("/alocacoes")
+    public ResponseEntity<?> removeAlocacao(@RequestBody Map<String, String> body) {
+        try {
+            String disc = body.get("disciplina");
+            String doc = body.get("docente");
+            String amb = body.get("ambiente");
+            String turma = body.getOrDefault("turma", "T1");
+            String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");
+            Integer per = (perStr != null && !perStr.isEmpty()) ? Integer.parseInt(perStr.replaceAll("\\D+", "")) : 1;
+            String dia = body.getOrDefault("diaSemana", "SEG");
+            Time hIni = Time.valueOf(body.getOrDefault("horarioInicio", "08:00:00"));
+            Time hFim = Time.valueOf(body.getOrDefault("horarioFim", "09:40:00"));
+
+            alocacaoHorarioRepository.removerAlocacoes(disc, doc, amb, turma, per, dia, hIni, hFim);
+            return ResponseEntity.ok("Alocação removida com sucesso");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
         }

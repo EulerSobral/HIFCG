@@ -1,20 +1,11 @@
 -- =============================================================================
--- HIFCG: Schema de Banco de Dados H2
+-- HIFCG: Schema de Banco de Dados PostgreSQL
 -- Sistema de Gestão de Alocação de Horários do IFPB - Campina Grande
 -- =============================================================================
 
-DROP TABLE IF EXISTS log_sistema;
-DROP TABLE IF EXISTS alocacao_horario;
-DROP TABLE IF EXISTS disciplina;
-DROP TABLE IF EXISTS curso;
-DROP TABLE IF EXISTS ambiente;
-DROP TABLE IF EXISTS docente;
-DROP TABLE IF EXISTS periodo;
-DROP TABLE IF EXISTS coordenador;
-
 -- 1. Tabela de Coordenadores e Administradores (RF31, RF33, RF38)
-CREATE TABLE coordenador (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS coordenador (
+    id BIGSERIAL PRIMARY KEY,
     matricula VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
@@ -25,8 +16,8 @@ CREATE TABLE coordenador (
 );
 
 -- 2. Tabela de Docentes (RF1, RF2, RF3, RF5)
-CREATE TABLE docente (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS docente (
+    id BIGSERIAL PRIMARY KEY,
     matricula VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
@@ -34,8 +25,8 @@ CREATE TABLE docente (
 );
 
 -- 3. Tabela de Ambientes (RF8, RF9, RF10, RF11)
-CREATE TABLE ambiente (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS ambiente (
+    id BIGSERIAL PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     descricao VARCHAR(10000) NOT NULL,
@@ -44,29 +35,31 @@ CREATE TABLE ambiente (
 );
 
 -- 4. Tabela de Cursos (RF13, RF14, RF15, RF19)
-CREATE TABLE curso (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS curso (
+    id BIGSERIAL PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     turno VARCHAR(30) NOT NULL, -- 'INTEGRAL', 'MATUTINO', 'VESPERTINO', 'NOTURNO'
-    nivel VARCHAR(50) NOT NULL, -- 'TECNICO_INTEGRADO', 'SUPERIOR', 'POS_GRADUACAO'
+    nivel VARCHAR(50) NOT NULL, -- 'TECNICO_INTEGRADO', 'TECNICO_SUBSEQUENTE', 'SUPERIOR', 'POS_GRADUACAO'
     departamento VARCHAR(100) NOT NULL,
     periodos INT DEFAULT 6 NOT NULL
 );
 
 -- 5. Tabela de Disciplinas (RF16, RF17, RF18)
-CREATE TABLE disciplina (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS disciplina (
+    id BIGSERIAL PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
+    ementa TEXT,
+    especialidade VARCHAR(100),
     carga_horaria INT NOT NULL,
     curso_id VARCHAR(50) NOT NULL,
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
 
 -- 6. Tabela de Períodos Letivos
-CREATE TABLE periodo (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS periodo (
+    id BIGSERIAL PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     inicio VARCHAR(20) NOT NULL,
@@ -77,8 +70,8 @@ CREATE TABLE periodo (
 );
 
 -- 7. Tabela de Alocação de Horários (RF24, RF25, RF26, RF27, RF28, RF30)
-CREATE TABLE alocacao_horario (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS alocacao_horario (
+    id BIGSERIAL PRIMARY KEY,
     disciplina VARCHAR(100) NOT NULL,
     docente VARCHAR(100) NOT NULL,
     ambiente VARCHAR(100) NOT NULL,
@@ -90,62 +83,103 @@ CREATE TABLE alocacao_horario (
 );
 
 -- 8. Tabela de Log de Alterações e Auditoria (RF34)
-CREATE TABLE log_sistema (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS log_sistema (
+    id BIGSERIAL PRIMARY KEY,
     usuario_matricula VARCHAR(50) NOT NULL,
     acao VARCHAR(255) NOT NULL,
-    detalhes CLOB,
+    detalhes TEXT,
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- =============================================================================
--- INSERÇÃO DE DADOS PADRÃO DE TESTES (SEEDS)
+-- INSERÇÃO DE DADOS PADRÃO (SEEDS IDEMPOTENTES)
 -- =============================================================================
 
 -- Diretor do Campus
 INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
-VALUES ('DIR001', 'Dr. Roberto Lima', 'diretor@ifpb.edu.br', '123456', 'DIRETOR', 'Campus', NULL);
+VALUES ('DIR001', 'Dr. Roberto Lima', 'diretor@ifpb.edu.br', '123456', 'DIRETOR', 'Campus', NULL)
+ON CONFLICT (matricula) DO NOTHING;
 
 -- Coordenador de Área (Departamento)
 INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
-VALUES ('DEP001', 'Profa. Ana Souza', 'area.info@ifpb.edu.br', '123456', 'AREA_DEPARTAMENTO', 'Informática', NULL);
+VALUES ('DEP001', 'Profa. Ana Souza', 'area.info@ifpb.edu.br', '123456', 'AREA_DEPARTAMENTO', 'Informática', NULL)
+ON CONFLICT (matricula) DO NOTHING;
 
 -- Coordenador de Curso
 INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo)
-VALUES ('COORD001', 'Prof. Carlos Mendes', 'curso.tads@ifpb.edu.br', '123456', 'CURSO', 'Informática', 'TADS');
+VALUES ('COORD001', 'Prof. Carlos Mendes', 'curso.tads@ifpb.edu.br', '123456', 'CURSO', 'Informática', 'TADS')
+ON CONFLICT (matricula) DO NOTHING;
 
--- Período Letivo Padrão
+-- Períodos Letivos Padrão
 INSERT INTO periodo (codigo, nome, inicio, fim, inicio_matricula, fim_matricula, ativo)
-VALUES ('P1', '2026.1', '2026-02-10', '2026-07-05', '2026-01-20', '2026-02-15', TRUE);
+VALUES ('P1', '2026.1', '2026-02-10', '2026-07-05', '2026-01-20', '2026-02-15', TRUE)
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO periodo (codigo, nome, inicio, fim, inicio_matricula, fim_matricula, ativo)
+VALUES ('P2', '2025.2', '2025-08-05', '2025-12-20', '2025-07-15', '2025-08-10', FALSE)
+ON CONFLICT (codigo) DO NOTHING;
 
 -- Cursos Padrão
 INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos)
-VALUES ('TADS', 'Tec. em Análise e Des. de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informática', 6);
+VALUES ('TADS', 'Tec. em Análise e Des. de Sistemas', 'NOTURNO', 'SUPERIOR', 'Informática', 6)
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos)
-VALUES ('INFO-INT', 'Técnico em Informática Integrado', 'INTEGRAL', 'TECNICO_INTEGRADO', 'Informática', 8);
+VALUES ('INFO-INT', 'Técnico em Informática Integrado', 'INTEGRAL', 'TECNICO_INTEGRADO', 'Informática', 8)
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos)
+VALUES ('ELET', 'Técnico em Eletromecânica', 'MATUTINO', 'TECNICO_SUBSEQUENTE', 'Indústria', 4)
+ON CONFLICT (codigo) DO NOTHING;
 
 -- Docentes Padrão
 INSERT INTO docente (matricula, nome, email, departamento)
-VALUES ('1001', 'Sicrano Pereira', 'sicrano@ifpb.edu.br', 'Matemática');
+VALUES ('1001', 'Sicrano Pereira', 'sicrano@ifpb.edu.br', 'Matemática')
+ON CONFLICT (matricula) DO NOTHING;
 
 INSERT INTO docente (matricula, nome, email, departamento)
-VALUES ('1002', 'Beltrano Silva', 'beltrano@ifpb.edu.br', 'Informática');
+VALUES ('1002', 'Beltrano Silva', 'beltrano@ifpb.edu.br', 'Informática')
+ON CONFLICT (matricula) DO NOTHING;
+
+INSERT INTO docente (matricula, nome, email, departamento)
+VALUES ('1003', 'Fulana Costa', 'fulana@ifpb.edu.br', 'Informática')
+ON CONFLICT (matricula) DO NOTHING;
+
+INSERT INTO docente (matricula, nome, email, departamento)
+VALUES ('1004', 'Mariana Rocha', 'mariana@ifpb.edu.br', 'Indústria')
+ON CONFLICT (matricula) DO NOTHING;
 
 -- Ambientes Padrão
 INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
-VALUES ('S-101', 'Sala 101', 'Sala de aula padrão', 40, 'SALA');
+VALUES ('S-101', 'Sala 101', 'Sala de aula padrão', 40, 'SALA')
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
-VALUES ('LAB-01', 'Laboratório 01', 'Laboratório de Informática', 30, 'LABORATORIO');
+VALUES ('LAB-01', 'Laboratório 01', 'Laboratório de Informática', 30, 'LABORATORIO')
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
+VALUES ('AUD-01', 'Auditório 01', 'Auditório principal', 120, 'AUDITORIO')
+ON CONFLICT (codigo) DO NOTHING;
 
 -- Disciplinas Padrão
 INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('MAT101', 'Matemática Discreta', 80, 'TADS');
+VALUES ('MAT101', 'Matemática Discreta', 80, 'TADS')
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('PRG101', 'Programação I', 80, 'TADS');
+VALUES ('PRG101', 'Programação I', 80, 'TADS')
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
+VALUES ('BD101', 'Banco de Dados', 60, 'TADS')
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
+VALUES ('RED101', 'Redes de Computadores', 60, 'INFO-INT')
+ON CONFLICT (codigo) DO NOTHING;
 
 -- Log de Inicialização
 INSERT INTO log_sistema (usuario_matricula, acao, detalhes)
-VALUES ('DIR001', 'sistema.inicio', 'Sistema HIFCG inicializado com dados padrão');
+SELECT 'DIR001', 'sistema.inicio', 'Sistema HIFCG inicializado com dados padrão'
+WHERE NOT EXISTS (SELECT 1 FROM log_sistema);

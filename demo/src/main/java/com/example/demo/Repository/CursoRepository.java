@@ -25,16 +25,18 @@ public class CursoRepository {
                 .turno(rs.getString("turno"))
                 .nivel(rs.getString("nivel"))
                 .departamento(rs.getString("departamento"))
+                .periodos(rs.getObject("periodos") != null ? rs.getInt("periodos") : 6)
                 .build());
     }
 
     public void update(Curso curso) {
-        String sql = "UPDATE curso SET nome = ?, turno = ?, nivel = ?, departamento = ? WHERE codigo = ?";
+        String sql = "UPDATE curso SET nome = ?, turno = ?, nivel = ?, departamento = ?, periodos = ? WHERE codigo = ?";
         jdbcTemplate.update(sql,
                 curso.getNome(),
                 curso.getTurno(),
                 curso.getNivel(),
                 curso.getDepartamento(),
+                curso.getPeriodos() != null ? curso.getPeriodos() : 6,
                 curso.getCodigo());
     }
 
@@ -42,13 +44,14 @@ public class CursoRepository {
         if (existsByCodigo(curso.getCodigo())) {
             update(curso);
         } else {
-            String sql = "INSERT INTO curso (codigo, nome, turno, nivel, departamento) VALUES (?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO curso (codigo, nome, turno, nivel, departamento, periodos) VALUES (?, ?, ?, ?, ?, ?)";
             jdbcTemplate.update(sql,
                     curso.getCodigo(),
                     curso.getNome(),
                     curso.getTurno(),
                     curso.getNivel(),
-                    curso.getDepartamento() != null ? curso.getDepartamento() : "Informática");
+                    curso.getDepartamento() != null ? curso.getDepartamento() : "Informática",
+                    curso.getPeriodos() != null ? curso.getPeriodos() : 6);
         }
     }
 
@@ -61,6 +64,7 @@ public class CursoRepository {
                 .turno(rs.getString("turno"))
                 .nivel(rs.getString("nivel"))
                 .departamento(rs.getString("departamento"))
+                .periodos(rs.getObject("periodos") != null ? rs.getInt("periodos") : 6)
                 .build(), codigo);
         return list.stream().findFirst();
     }
@@ -74,6 +78,7 @@ public class CursoRepository {
                 .turno(rs.getString("turno"))
                 .nivel(rs.getString("nivel"))
                 .departamento(rs.getString("departamento"))
+                .periodos(rs.getObject("periodos") != null ? rs.getInt("periodos") : 6)
                 .build(), "%" + (nome != null ? nome : "") + "%");
     }
 
