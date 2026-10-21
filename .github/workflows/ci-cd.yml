@@ -10,7 +10,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  # =========================================================================
   # 1. CI BACKEND - Testes (Unitários + Integração) e Build Spring Boot
+  # =========================================================================
   ci-backend:
     name: CI Backend (Java 26 & Spring Boot)
     runs-on: ubuntu-latest
@@ -38,8 +40,9 @@ jobs:
       - name: Compilar pacote de produção (bootJar)
         run: ./gradlew bootJar -x test --no-daemon
 
+  # =========================================================================
   # 2. CI FRONTEND - Instalação e Build React / Vite / TanStack Start
-
+  # =========================================================================
   ci-frontend:
     name: CI Frontend (Node 22 & Vite)
     runs-on: ubuntu-latest
@@ -66,26 +69,30 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL || '' }}
         run: npm run build
 
-  # 3. CD DEPLOY - Hospedagem 
+  # =========================================================================
+  # 3. CD DEPLOY - Hospedagem na Nuvem Hostinger (API Oficial Hostinger)
+  # =========================================================================
   cd-deploy:
-    name: CD Deploy no Servidor
+    name: CD Deploy na Hostinger Cloud
     needs: [ci-backend, ci-frontend]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
       - name: Deploy na VPS Hostinger via Docker Compose
-        uses: hostinger/deploy-action@v1
+        uses: hostinger/deploy-on-vps@v2
         with:
           api-key: ${{ secrets.HOSTINGER_API_KEY }}
           virtual-machine: ${{ vars.HOSTINGER_VM_ID || secrets.HOSTINGER_VM_ID }}
           project-name: hifcg
-          personal-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           docker-compose-path: docker-compose.yml
           environment-variables: |
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB || 'hifcgdb' }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USER || 'hifcg' }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || 'hifcg123' }}
             BACKEND_URL=${{ secrets.BACKEND_URL || 'http://backend:8080' }}
             VITE_API_URL=${{ secrets.VITE_API_URL || '' }}
             FRONTEND_PORT=${{ secrets.FRONTEND_PORT || '3000' }}
