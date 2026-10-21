@@ -1,0 +1,14 @@
+# Variáveis de Ambiente e Secrets (NUNCA versionar no Git)
+.env
+.env.*
+!.env.example
+
+# Artefatos de Deploy
+deploy.tar.gz
+
+# IDEs e Sistema Operacional
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

@@ -40,6 +40,29 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/")) {
+        const backendUrl =
+          (typeof process !== "undefined" && process.env?.BACKEND_URL) ||
+          "http://localhost:8080";
+        const targetUrl = `${backendUrl.replace(/\/$/, "")}${url.pathname}${url.search}`;
+        const headers = new Headers(request.headers);
+        headers.delete("host");
+        const proxyRes = await fetch(targetUrl, {
+          method: request.method,
+          headers,
+          body:
+            request.method !== "GET" && request.method !== "HEAD"
+              ? await request.arrayBuffer()
+              : undefined,
+        });
+        return new Response(proxyRes.body, {
+          status: proxyRes.status,
+          statusText: proxyRes.statusText,
+          headers: proxyRes.headers,
+        });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

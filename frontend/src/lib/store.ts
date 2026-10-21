@@ -2,20 +2,28 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   loginApi,
+  fetchDocentesApi,
   addDocenteApi,
   removeDocenteApi,
+  fetchAmbientesApi,
   addAmbienteApi,
   removeAmbienteApi,
+  fetchCursosApi,
   addCursoApi,
   removeCursoApi,
+  fetchDisciplinasApi,
   addDisciplinaApi,
   removeDisciplinaApi,
+  fetchPeriodosApi,
   addPeriodoApi,
   removePeriodoApi,
+  fetchCoordenadoresApi,
   addCoordenadorApi,
   removeCoordenadorApi,
+  fetchAlocacoesApi,
   addAlocacaoApi,
   removeAlocacaoApi,
+  fetchLogsApi,
   addLogApi,
 } from "./api";
 
@@ -114,6 +122,7 @@ interface State {
 
   login: (email: string, senha: string) => Promise<User | null>;
   logout: () => void;
+  syncFromBackend: () => Promise<void>;
 
   addLog: (acao: string, detalhe: string) => void;
 
@@ -250,6 +259,7 @@ export const useStore = create<State>()(
           }
           set({ currentUserId: userInStore.id });
           get().addLog("login", `Usuário ${userInStore.nome} acessou o sistema via PostgreSQL`);
+          void get().syncFromBackend();
           return userInStore;
         }
 
@@ -263,6 +273,169 @@ export const useStore = create<State>()(
         return u;
       },
       logout: () => set({ currentUserId: null }),
+
+      syncFromBackend: async () => {
+        try {
+          const [dbCursos, dbDocentes, dbAmbientes, dbDisciplinas, dbPeriodos, dbAlocacoes, dbLogs] =
+            await Promise.all([
+              fetchCursosApi(),
+              fetchDocentesApi(),
+              fetchAmbientesApi(),
+              fetchDisciplinasApi(),
+              fetchPeriodosApi(),
+              fetchAlocacoesApi(),
+              fetchLogsApi(),
+            ]);
+
+          const current = get();
+
+          const normTurno = (t?: string): Curso["turno"] => {
+            const u = (t || "").toUpperCase();
+            if (u.includes("INTEGRAL")) return "Integral";
+            if (u.includes("MATUTINO")) return "Matutino";
+            if (u.includes("VESPERTINO")) return "Vespertino";
+            return "Noturno";
+          };
+
+          const normNivel = (n?: string): Curso["nivel"] => {
+            const u = (n || "").toUpperCase();
+            if (u.includes("INTEGRADO")) return "Técnico Integrado";
+            if (u.includes("SUBSEQUENTE")) return "Técnico Subsequente";
+            if (u.includes("POS") || u.includes("PÓS")) return "Pós-Graduação";
+            return "Superior";
+          };
+
+          const normTipoAmb = (t?: string): Ambiente["tipo"] => {
+            const u = (t || "").toUpperCase();
+            if (u.includes("LAB")) return "Laboratório";
+            if (u.includes("AUD")) return "Auditório";
+            if (u.includes("QUADRA")) return "Quadra";
+            if (u.includes("SALA")) return "Sala";
+            return "Outros";
+          };
+
+          const nextCursos: Curso[] = Array.isArray(dbCursos) && dbCursos.length > 0
+            ? dbCursos.map((c: any) => {
+                const ex = current.cursos.find((x) => x.codigo === c.codigo);
+                return {
+                  id: ex?.id || c.codigo || String(c.id),
+                  codigo: c.codigo,
+                  nome: c.nome,
+                  turno: ex?.turno || normTurno(c.turno),
+                  nivel: ex?.nivel || normNivel(c.nivel),
+                  area: c.departamento || ex?.area || "Informática",
+                  periodos: Number(c.periodos) || ex?.periodos || 6,
+                };
+              })
+            : current.cursos;
+
+          const nextDocentes: Docente[] = Array.isArray(dbDocentes) && dbDocentes.length > 0
+            ? dbDocentes.map((d: any) => {
+                const ex = current.docentes.find((x) => x.matricula === d.matricula);
+                return {
+                  id: ex?.id || d.matricula || String(d.id),
+                  nome: d.nome,
+                  email: d.email,
+                  matricula: d.matricula,
+                  area: d.departamento || ex?.area || "Informática",
+                };
+              })
+            : current.docentes;
+
+          const nextAmbientes: Ambiente[] = Array.isArray(dbAmbientes) && dbAmbientes.length > 0
+            ? dbAmbientes.map((a: any) => {
+                const ex = current.ambientes.find((x) => x.codigo === a.codigo);
+                return {
+                  id: ex?.id || a.codigo || String(a.id),
+                  codigo: a.codigo,
+                  tipo: ex?.tipo || normTipoAmb(a.tipo),
+                  descricao: a.descricao ?? ex?.descricao ?? "",
+                  recursos: ex?.recursos || ["Projetor", "Ar-condicionado"],
+                  capacidade: Number(a.capacidade) || ex?.capacidade || 30,
+                  bloco: ex?.bloco || "A",
+                };
+              })
+            : current.ambientes;
+
+          const nextDisciplinas: Disciplina[] = Array.isArray(dbDisciplinas) && dbDisciplinas.length > 0
+            ? dbDisciplinas.map((d: any) => {
+                const ex = current.disciplinas.find((x) => x.codigo === d.codigo);
+                const matchedCurso = nextCursos.find((c) => c.codigo === d.curso || c.id === d.curso);
+                return {
+                  id: ex?.id || d.codigo || String(d.id),
+                  codigo: d.codigo,
+                  nome: d.nome,
+                  cursoId: matchedCurso?.id || ex?.cursoId || nextCursos[0]?.id || "c1",
+                  periodo: ex?.periodo || 1,
+                  cargaHoraria: Number(d.cargaHoraria) || ex?.cargaHoraria || 60,
+                };
+              })
+            : current.disciplinas;
+
+          const nextPeriodos: Periodo[] = Array.isArray(dbPeriodos) && dbPeriodos.length > 0
+            ? dbPeriodos.map((p: any) => {
+                const ex = current.periodos.find((x) => x.nome === p.nome || x.id === p.codigo);
+                return {
+                  id: ex?.id || p.codigo || p.nome || String(p.id),
+                  nome: p.nome,
+                  inicio: p.inicio,
+                  fim: p.fim,
+                  inicioMatricula: p.inicioMatricula,
+                  fimMatricula: p.fimMatricula,
+                  ativo: Boolean(p.ativo),
+                };
+              })
+            : current.periodos;
+
+          const nextAlocacoes: Alocacao[] = Array.isArray(dbAlocacoes)
+            ? dbAlocacoes.map((a: any) => {
+                const disc = nextDisciplinas.find((d) => d.codigo === a.disciplina || d.id === a.disciplina);
+                const doc = nextDocentes.find((d) => d.matricula === a.docente || d.id === a.docente);
+                const amb = nextAmbientes.find((am) => am.codigo === a.ambiente || am.id === a.ambiente);
+                const cur = nextCursos.find((c) => c.codigo === a.turma || c.id === a.turma);
+                const diaIdx = DIA_CODES.indexOf(String(a.dia_semana || "SEG").toUpperCase());
+                const hIni = String(a.horario_inicio || "08:00").slice(0, 5);
+                const hFim = String(a.horario_fim || "09:40").slice(0, 5);
+                return {
+                  id: String(a.id),
+                  disciplinaId: disc?.id || a.disciplina,
+                  docenteId: doc?.id || a.docente,
+                  ambienteId: amb?.id || a.ambiente,
+                  cursoId: cur?.id || a.turma,
+                  periodoCurso: Number(a.periodo) || 1,
+                  dia: diaIdx >= 0 ? diaIdx : 0,
+                  horario: `${hIni}-${hFim}`,
+                };
+              })
+            : current.alocacoes;
+
+          const nextLogs: LogEntry[] = Array.isArray(dbLogs) && dbLogs.length > 0
+            ? dbLogs.map((l: any) => {
+                const u = current.users.find((x) => x.id === l.usuarioMatricula);
+                return {
+                  id: String(l.id),
+                  userId: l.usuarioMatricula || "sistema",
+                  userName: u?.nome || l.usuarioMatricula || "Sistema",
+                  acao: l.acao || "evento",
+                  detalhe: l.detalhes || "",
+                  timestamp: l.dataHora || new Date().toISOString(),
+                };
+              })
+            : current.logs;
+
+          set({
+            cursos: nextCursos,
+            docentes: nextDocentes,
+            ambientes: nextAmbientes,
+            disciplinas: nextDisciplinas,
+            periodos: nextPeriodos,
+            alocacoes: nextAlocacoes,
+            logs: nextLogs,
+          });
+        } catch (err) {
+          console.warn("Falha ao sincronizar com o backend:", err);
+        }
+      },
 
       addLog: (acao, detalhe) => {
         const uId = get().currentUserId;

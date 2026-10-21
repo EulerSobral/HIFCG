@@ -1,6 +1,12 @@
+const envApiUrl =
+  typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_API_URL : undefined;
+
 const API_BASE_URL =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) ||
-  "http://localhost:8080";
+  envApiUrl && envApiUrl !== "http://localhost:8080"
+    ? envApiUrl.replace(/\/$/, "")
+    : typeof window !== "undefined"
+      ? ""
+      : (typeof process !== "undefined" && process.env?.BACKEND_URL) || "http://localhost:8080";
 
 export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000): Promise<Response> {
   const controller = new AbortController();

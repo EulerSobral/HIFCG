@@ -10,8 +10,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-hifcgdb}
       POSTGRES_USER: ${POSTGRES_USER:-hifcg}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,22 +33,30 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-hifcg}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
-    ports:
-      - "8080:8080"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
     image: hifcg-frontend:latest
     container_name: hifcg-frontend
     restart: unless-stopped
     depends_on:
       - backend
     environment:
-      VITE_API_URL: http://localhost:8080
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8080}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: hifcg-tunnel
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    command: tunnel --no-autoupdate --url http://frontend:3000
 
 volumes:
   postgres_data:
