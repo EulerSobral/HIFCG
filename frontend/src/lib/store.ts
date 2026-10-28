@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   loginApi,
+  updateDiretorCredenciaisApi,
   fetchDocentesApi,
   addDocenteApi,
   removeDocenteApi,
@@ -29,6 +30,8 @@ import {
 
 export type Role = "diretor" | "coord_area" | "coord_curso";
 
+export const CICLO_CREDENCIAIS_DIRETOR_DIAS = 7;
+
 export interface User {
   id: string;
   nome: string;
@@ -40,6 +43,54 @@ export interface User {
   role: Role;
   area?: string;
   cursoId?: string;
+  /** Data ISO da última alteração de senha/credenciais (usada no ciclo de 7 dias do Diretor). */
+  ultimaAlteracaoCredenciais?: string;
+}
+
+export interface StatusCredenciaisDiretor {
+  isDiretor: boolean;
+  diasDecorridos: number;
+  diasRestantes: number;
+  emPeriodoDeAviso: boolean;
+  expirado: boolean;
+  ultimaAlteracao: Date;
+  proximaRenovacao: Date;
+}
+
+export function getStatusCredenciaisDiretor(user: User | null | undefined): StatusCredenciaisDiretor {
+  const agora = new Date();
+  if (!user || user.role !== "diretor") {
+    return {
+      isDiretor: false,
+      diasDecorridos: 0,
+      diasRestantes: CICLO_CREDENCIAIS_DIRETOR_DIAS,
+      emPeriodoDeAviso: false,
+      expirado: false,
+      ultimaAlteracao: agora,
+      proximaRenovacao: new Date(agora.getTime() + CICLO_CREDENCIAIS_DIRETOR_DIAS * 86400000),
+    };
+  }
+
+  const ultimaAlteracao = user.ultimaAlteracaoCredenciais
+    ? new Date(user.ultimaAlteracaoCredenciais)
+    : new Date(agora.getTime() - 4 * 86400000); // Caso sem registro inicial, entra na janela de aviso (faltando 3 dias)
+  const diffMs = Math.max(0, agora.getTime() - ultimaAlteracao.getTime());
+  const diasDecorridos = Math.floor(diffMs / 86400000);
+  const diasRestantes = Math.max(0, CICLO_CREDENCIAIS_DIRETOR_DIAS - diasDecorridos);
+  const expirado = diasDecorridos >= CICLO_CREDENCIAIS_DIRETOR_DIAS;
+  // Solicita/avisa durante a semana (especialmente nos últimos 3 dias ou se já expirou)
+  const emPeriodoDeAviso = !expirado && diasRestantes <= 3;
+  const proximaRenovacao = new Date(ultimaAlteracao.getTime() + CICLO_CREDENCIAIS_DIRETOR_DIAS * 86400000);
+
+  return {
+    isDiretor: true,
+    diasDecorridos,
+    diasRestantes,
+    emPeriodoDeAviso,
+    expirado,
+    ultimaAlteracao,
+    proximaRenovacao,
+  };
 }
 
 export interface Docente {
@@ -149,6 +200,12 @@ interface State {
   addUser: (u: Omit<User, "id" | "salt" | "senhaHash"> & { senha: string }) => Promise<void>;
   updateUser: (id: string, u: Partial<Omit<User, "salt" | "senhaHash">>) => void;
   setUserPassword: (id: string, senha: string) => Promise<void>;
+  renovarCredenciaisDiretor: (params: {
+    nome?: string;
+    email?: string;
+    novaSenha: string;
+    senhaAtual?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
   removeUser: (id: string) => void;
 
   setAlocacao: (a: Omit<Alocacao, "id"> & { id?: string }) => string | null;
@@ -241,6 +298,10 @@ export const useStore = create<State>()(
         const backendUser = await loginApi(email, senha);
         if (backendUser) {
           let userInStore = get().users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
+          const ultimaAlt =
+            typeof backendUser.ultimaAlteracaoCredenciais === "string"
+              ? backendUser.ultimaAlteracaoCredenciais
+              : userInStore?.ultimaAlteracaoCredenciais;
           if (!userInStore) {
             const salt = randomSalt();
             const senhaHash = await hashSenha(salt, senha);
@@ -254,8 +315,13 @@ export const useStore = create<State>()(
               role: backendUser.role as Role,
               area: backendUser.area,
               cursoId: matchedCurso ? matchedCurso.id : backendUser.cursoId,
+              ultimaAlteracaoCredenciais: ultimaAlt,
             };
             set((s) => ({ users: [...s.users, userInStore!] }));
+          } else if (ultimaAlt && userInStore.ultimaAlteracaoCredenciais !== ultimaAlt) {
+            const updatedUser = { ...userInStore, ultimaAlteracaoCredenciais: ultimaAlt };
+            userInStore = updatedUser;
+            set((s) => ({ users: s.users.map((x) => (x.id === updatedUser.id ? updatedUser : x)) }));
           }
           set({ currentUserId: userInStore.id });
           get().addLog("login", `Usuário ${userInStore.nome} acessou o sistema via PostgreSQL`);
@@ -570,13 +636,84 @@ export const useStore = create<State>()(
       setUserPassword: async (id, senha) => {
         const salt = randomSalt();
         const senhaHash = await hashSenha(salt, senha);
-        set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, salt, senhaHash } : x)) }));
+        const ultimaAlteracaoCredenciais = new Date().toISOString();
+        set((s) => ({
+          users: s.users.map((x) => (x.id === id ? { ...x, salt, senhaHash, ultimaAlteracaoCredenciais } : x)),
+        }));
         const target = get().users.find((x) => x.id === id);
         if (target) {
           const cursoCodigo = target.cursoId ? get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId : undefined;
           addCoordenadorApi({ matricula: target.id, nome: target.nome, email: target.email, senha, role: target.role, area: target.area, cursoId: cursoCodigo });
         }
         get().addLog("usuario.senha", id);
+      },
+      renovarCredenciaisDiretor: async ({ nome, email, novaSenha, senhaAtual }) => {
+        const currentId = get().currentUserId;
+        const diretor = get().users.find((u) => u.id === currentId) || get().users.find((u) => u.role === "diretor");
+        if (!diretor) {
+          return { ok: false, error: "Usuário Diretor não encontrado." };
+        }
+
+        const senhaLimpa = (novaSenha || "").trim();
+        if (!senhaLimpa) {
+          return { ok: false, error: "A nova senha é obrigatória para renovar o ciclo semanal." };
+        }
+        if (senhaLimpa.length < 6) {
+          return { ok: false, error: "A nova senha deve possuir no mínimo 6 caracteres." };
+        }
+        if (senhaLimpa === "123456") {
+          return { ok: false, error: "Por segurança, a nova senha não pode ser a senha padrão (123456)." };
+        }
+
+        const hashNovaComSaltAtual = await hashSenha(diretor.salt, senhaLimpa);
+        if (safeEqual(hashNovaComSaltAtual, diretor.senhaHash)) {
+          return { ok: false, error: "A nova senha deve ser obrigatoriamente diferente da senha atual." };
+        }
+
+        const nomeFinal = nome && nome.trim().length > 0 ? nome.trim() : diretor.nome;
+        const emailFinal = email && email.trim().length > 0 ? email.trim() : diretor.email;
+
+        const apiRes = await updateDiretorCredenciaisApi({
+          matricula: diretor.id === "u1" ? "DIR001" : diretor.id,
+          nome: nomeFinal,
+          email: emailFinal,
+          emailAtual: diretor.email,
+          senhaAtual,
+          novaSenha: senhaLimpa,
+        });
+
+        if (apiRes && !apiRes.ok) {
+          return { ok: false, error: apiRes.error };
+        }
+
+        const novoSalt = randomSalt();
+        const novoHash = await hashSenha(novoSalt, senhaLimpa);
+        const agoraIso = apiRes?.data?.ultimaAlteracaoCredenciais || new Date().toISOString();
+
+        const mudouDadosCadastrais = nomeFinal !== diretor.nome || emailFinal !== diretor.email;
+        set((s) => ({
+          users: s.users.map((u) =>
+            u.id === diretor.id
+              ? {
+                  ...u,
+                  nome: nomeFinal,
+                  email: emailFinal,
+                  salt: novoSalt,
+                  senhaHash: novoHash,
+                  ultimaAlteracaoCredenciais: agoraIso,
+                }
+              : u,
+          ),
+        }));
+
+        get().addLog(
+          "diretor.credenciais.renovadas",
+          mudouDadosCadastrais
+            ? `Senha renovada (ciclo de 7 dias) e titular/e-mail atualizado para ${nomeFinal} (${emailFinal})`
+            : `Senha renovada obrigatoriamente no ciclo de 7 dias por ${nomeFinal}`,
+        );
+
+        return { ok: true };
       },
       removeUser: (id) => {
         const target = get().users.find((x) => x.id === id);

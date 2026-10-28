@@ -3,6 +3,8 @@ package com.example.demo.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "coordenador")
 @Data
@@ -35,4 +37,7 @@ public class Coordenador {
 
     @Column(name = "curso_codigo", length = 50)
     private String cursoCodigo;
+
+    @Column(name = "ultima_alteracao_credenciais")
+    private LocalDateTime ultimaAlteracaoCredenciais;
 }

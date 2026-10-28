@@ -12,8 +12,11 @@ CREATE TABLE IF NOT EXISTS coordenador (
     senha VARCHAR(255) NOT NULL,
     tipo_coordenador VARCHAR(30) NOT NULL, -- 'DIRETOR', 'AREA_DEPARTAMENTO', 'CURSO'
     departamento VARCHAR(100),
-    curso_codigo VARCHAR(50)
+    curso_codigo VARCHAR(50),
+    ultima_alteracao_credenciais TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
+
+ALTER TABLE coordenador ADD COLUMN IF NOT EXISTS ultima_alteracao_credenciais TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL;
 
 -- 2. Tabela de Docentes (RF1, RF2, RF3, RF5)
 CREATE TABLE IF NOT EXISTS docente (

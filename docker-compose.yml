@@ -7,13 +7,13 @@ services:
     container_name: hifcg-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-hifcgdb}
-      POSTGRES_USER: ${POSTGRES_USER:-hifcg}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hifcg} -d ${POSTGRES_DB:-hifcgdb}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,9 +29,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-hifcgdb}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-hifcg}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hifcg123}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
 
   frontend:

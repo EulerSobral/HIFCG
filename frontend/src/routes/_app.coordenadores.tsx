@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/Combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useStore, useCurrentUser, roleLabel, type Role, type User } from "@/lib/store";
+import { useStore, useCurrentUser, roleLabel, getStatusCredenciaisDiretor, type Role, type User } from "@/lib/store";
 import { KeyRound, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,10 +26,12 @@ function Page() {
   const updateUser = useStore((s) => s.updateUser);
   const removeUser = useStore((s) => s.removeUser);
   const setUserPassword = useStore((s) => s.setUserPassword);
+  const renovarCredenciaisDiretor = useStore((s) => s.renovarCredenciaisDiretor);
   const [open, setOpen] = useState(false);
   const [openSelfEdit, setOpenSelfEdit] = useState(false);
   const [role, setRole] = useState<Role>("coord_curso");
   const [cursoId, setCursoId] = useState(cursos[0]?.id ?? "");
+  const statusDiretor = getStatusCredenciaisDiretor(me);
 
   const allowedToCreate: Role[] =
     me?.role === "diretor"
@@ -60,6 +62,25 @@ function Page() {
     const nome = String(f.get("nome") || "").trim();
     const email = String(f.get("email") || "").trim();
     const novaSenha = String(f.get("senha") || "").trim();
+
+    if (me.role === "diretor") {
+      if (!novaSenha) {
+        toast.error("Para o perfil Diretor, a alteração da senha é obrigatória para renovar o período de 1 semana.");
+        return;
+      }
+      const res = await renovarCredenciaisDiretor({
+        nome: nome || me.nome,
+        email: email || me.email,
+        novaSenha,
+      });
+      if (!res.ok) {
+        toast.error(res.error || "Erro ao renovar credenciais do Diretor.");
+        return;
+      }
+      toast.success("Senha do Diretor renovada com sucesso! Prazo de 7 dias reiniciado.");
+      setOpenSelfEdit(false);
+      return;
+    }
 
     if (nome && email) {
       updateUser(me.id, { nome, email });
@@ -96,17 +117,35 @@ function Page() {
                 </DialogHeader>
                 <form onSubmit={submitSelfEdit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Nome</Label>
+                    <Label>
+                      {me?.role === "diretor" ? "Nova senha (obrigatória no ciclo de 7 dias) *" : "Nova senha (opcional)"}
+                    </Label>
+                    <Input
+                      type="password"
+                      name="senha"
+                      required={me?.role === "diretor"}
+                      minLength={me?.role === "diretor" ? 6 : undefined}
+                      placeholder={
+                        me?.role === "diretor"
+                          ? "Obrigatório informar nova senha diferente da atual"
+                          : "Deixe em branco para não alterar"
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{me?.role === "diretor" ? "Nome (opcional — manter se não mudou o titular)" : "Nome"}</Label>
                     <Input name="nome" required defaultValue={me?.nome} />
                   </div>
                   <div className="space-y-2">
-                    <Label>E-mail</Label>
+                    <Label>{me?.role === "diretor" ? "E-mail (opcional — manter se não mudou)" : "E-mail"}</Label>
                     <Input type="email" name="email" required defaultValue={me?.email} />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Nova senha (opcional)</Label>
-                    <Input type="password" name="senha" placeholder="Deixe em branco para não alterar" />
-                  </div>
+                  {statusDiretor.isDiretor && (
+                    <div className="rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
+                      Ciclo semanal da Direção: restam <strong>{statusDiretor.diasRestantes} dia(s)</strong> (próxima renovação até{" "}
+                      {statusDiretor.proximaRenovacao.toLocaleDateString("pt-BR")}).
+                    </div>
+                  )}
                   <DialogFooter>
                     <Button type="submit">Salvar credenciais</Button>
                   </DialogFooter>

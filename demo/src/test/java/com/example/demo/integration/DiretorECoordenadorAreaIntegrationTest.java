@@ -318,4 +318,31 @@ class DiretorECoordenadorAreaIntegrationTest {
                 .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
                 .andExpect(jsonPath("$[0].acao", is("sistema.inicio")));
     }
+
+    @Test
+    @DisplayName("Integração: Diretor renova obrigatoriamente a senha no ciclo de 7 dias e registra log de auditoria no H2")
+    void testRenovacaoCredenciaisDiretorIntegration() throws Exception {
+        Map<String, String> payload = Map.of(
+                "matricula", "DIR001",
+                "novaSenha", "Diretor@2026Segura"
+        );
+
+        mockMvc.perform(put("/Diretor/credenciais")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.diasRestantesCredenciais", is(7)))
+                .andExpect(jsonPath("$.credenciaisExpiradas", is(false)))
+                .andExpect(jsonPath("$.nome", is("Dr. Roberto Lima")))
+                .andExpect(jsonPath("$.email", is("diretor@ifpb.edu.br")));
+
+        var diretorAtualizado = coordenadorRepository.findCoordenadorByMatricula("DIR001");
+        assertTrue(diretorAtualizado.isPresent());
+        assertEquals("Diretor@2026Segura", diretorAtualizado.get().getSenha());
+        assertNotNull(diretorAtualizado.get().getUltimaAlteracaoCredenciais());
+
+        mockMvc.perform(get("/Diretor/logs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].acao", hasItem("diretor.credenciais.renovadas")));
+    }
 }

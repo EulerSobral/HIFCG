@@ -19,7 +19,8 @@ CREATE TABLE coordenador (
     senha VARCHAR(255) NOT NULL,
     tipo_coordenador VARCHAR(30) NOT NULL,
     departamento VARCHAR(100),
-    curso_codigo VARCHAR(50)
+    curso_codigo VARCHAR(50),
+    ultima_alteracao_credenciais TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE docente (

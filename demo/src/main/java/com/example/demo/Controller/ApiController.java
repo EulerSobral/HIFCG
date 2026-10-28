@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Time;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,15 @@ public class ApiController {
 
             String token = tokenService.generateToken(c.getEmail(), c.getTipoCoordenador());
 
+            LocalDateTime ultimaAlt = c.getUltimaAlteracaoCredenciais() != null
+                    ? c.getUltimaAlteracaoCredenciais()
+                    : LocalDateTime.now();
+            long diasDecorridos = Math.max(0, ChronoUnit.DAYS.between(ultimaAlt, LocalDateTime.now()));
+            long diasRestantes = Math.max(0, 7 - diasDecorridos);
+            boolean isDiretor = "DIRETOR".equalsIgnoreCase(c.getTipoCoordenador());
+            boolean credenciaisExpiradas = isDiretor && diasDecorridos >= 7;
+            boolean solicitarAlteracaoCredenciais = isDiretor && (diasRestantes <= 3 || "123456".equals(c.getSenha()) || credenciaisExpiradas);
+
             Map<String, Object> resp = new HashMap<>();
             resp.put("id", c.getMatricula());
             resp.put("nome", c.getNome());
@@ -86,6 +96,107 @@ public class ApiController {
             resp.put("area", c.getDepartamento());
             resp.put("cursoId", c.getCursoCodigo());
             resp.put("token", token);
+            resp.put("ultimaAlteracaoCredenciais", ultimaAlt.toString());
+            resp.put("diasRestantesCredenciais", diasRestantes);
+            resp.put("solicitarAlteracaoCredenciais", solicitarAlteracaoCredenciais);
+            resp.put("credenciaisExpiradas", credenciaisExpiradas);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @PutMapping("/diretor/credenciais")
+    public ResponseEntity<?> atualizarCredenciaisDiretor(@RequestBody Map<String, String> body) {
+        try {
+            String matricula = body.getOrDefault("matricula", "DIR001");
+            Optional<Coordenador> opt = coordenadorRepository.findCoordenadorByMatricula(matricula);
+            if (opt.isEmpty() && body.get("emailAtual") != null) {
+                opt = coordenadorRepository.findByEmailObject(body.get("emailAtual"));
+            }
+            if (opt.isEmpty() && body.get("email") != null) {
+                opt = coordenadorRepository.findByEmailObject(body.get("email"));
+            }
+            if (opt.isEmpty()) {
+                return ResponseEntity.status(404).body("Usuário Diretor não encontrado.");
+            }
+
+            Coordenador diretor = opt.get();
+            if (!"DIRETOR".equalsIgnoreCase(diretor.getTipoCoordenador())) {
+                return ResponseEntity.status(403).body("Apenas o perfil DIRETOR pode utilizar este fluxo de renovação semanal.");
+            }
+
+            String novaSenha = body.get("novaSenha");
+            if (novaSenha == null || novaSenha.isBlank()) {
+                novaSenha = body.get("senha");
+            }
+            if (novaSenha == null || novaSenha.isBlank()) {
+                novaSenha = body.get("password");
+            }
+
+            if (novaSenha == null || novaSenha.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("A alteração da senha é obrigatória no ciclo semanal.");
+            }
+            novaSenha = novaSenha.trim();
+
+            if (novaSenha.length() < 6) {
+                return ResponseEntity.badRequest().body("A nova senha deve possuir pelo menos 6 caracteres.");
+            }
+            if ("123456".equals(novaSenha)) {
+                return ResponseEntity.badRequest().body("A nova senha não pode ser a senha padrão inicial (123456).");
+            }
+            if (novaSenha.equals(diretor.getSenha())) {
+                return ResponseEntity.badRequest().body("A nova senha deve ser obrigatoriamente diferente da senha atual.");
+            }
+
+            String senhaAtualInformada = body.get("senhaAtual");
+            if (senhaAtualInformada != null && !senhaAtualInformada.isBlank() && !senhaAtualInformada.equals(diretor.getSenha())) {
+                return ResponseEntity.status(401).body("A senha atual informada está incorreta.");
+            }
+
+            String nomeAnterior = diretor.getNome();
+            String emailAnterior = diretor.getEmail();
+
+            // Nome e e-mail são opcionais: mantêm-se os atuais caso não mudem
+            String novoNome = body.get("nome");
+            if (novoNome != null && !novoNome.trim().isEmpty()) {
+                diretor.setNome(novoNome.trim());
+            }
+            String novoEmail = body.get("email");
+            if (novoEmail != null && !novoEmail.trim().isEmpty()) {
+                diretor.setEmail(novoEmail.trim());
+            }
+
+            LocalDateTime agora = LocalDateTime.now();
+            diretor.setSenha(novaSenha);
+            diretor.setUltimaAlteracaoCredenciais(agora);
+
+            coordenadorRepository.save(diretor);
+
+            boolean mudouTitularOuEmail = !nomeAnterior.equals(diretor.getNome()) || !emailAnterior.equals(diretor.getEmail());
+            String detalhesLog = mudouTitularOuEmail
+                    ? String.format("Renovação semanal de senha e atualização cadastral do Diretor (%s <%s> -> %s <%s>)",
+                    nomeAnterior, emailAnterior, diretor.getNome(), diretor.getEmail())
+                    : String.format("Renovação semanal obrigatória de senha realizada pelo Diretor %s (%s)",
+                    diretor.getNome(), diretor.getEmail());
+
+            logSistemaRepository.save(LogSistema.builder()
+                    .usuarioMatricula(diretor.getMatricula())
+                    .acao("diretor.credenciais.renovadas")
+                    .detalhes(detalhesLog)
+                    .dataHora(agora)
+                    .build());
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("mensagem", "Credenciais do Diretor atualizadas com sucesso! Ciclo de 7 dias renovado.");
+            resp.put("id", diretor.getMatricula());
+            resp.put("nome", diretor.getNome());
+            resp.put("email", diretor.getEmail());
+            resp.put("ultimaAlteracaoCredenciais", agora.toString());
+            resp.put("diasRestantesCredenciais", 7);
+            resp.put("solicitarAlteracaoCredenciais", false);
+            resp.put("credenciaisExpiradas", false);
 
             return ResponseEntity.ok(resp);
         } catch (Exception ex) {
@@ -119,10 +230,15 @@ public class ApiController {
                 }
             }
 
-            String senha = body.get("senha");
-            if (senha == null || senha.isEmpty()) {
-                senha = existing.map(Coordenador::getSenha).orElse("123456");
-            }
+            String senhaInformada = body.get("senha");
+            boolean alterouSenha = senhaInformada != null && !senhaInformada.isEmpty();
+            String senha = alterouSenha
+                    ? senhaInformada
+                    : existing.map(Coordenador::getSenha).orElse("123456");
+
+            LocalDateTime ultimaAlt = alterouSenha
+                    ? LocalDateTime.now()
+                    : existing.map(Coordenador::getUltimaAlteracaoCredenciais).orElse(LocalDateTime.now());
 
             Coordenador c = Coordenador.builder()
                     .matricula(matricula)
@@ -132,6 +248,7 @@ public class ApiController {
                     .tipoCoordenador(tipo)
                     .departamento(body.get("area") != null ? body.get("area") : body.get("departamento"))
                     .cursoCodigo(body.get("cursoId") != null ? body.get("cursoId") : body.get("cursoCodigo"))
+                    .ultimaAlteracaoCredenciais(ultimaAlt)
                     .build();
             coordenadorRepository.save(c);
             return ResponseEntity.ok(c);

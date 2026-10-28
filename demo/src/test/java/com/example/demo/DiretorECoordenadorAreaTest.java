@@ -366,4 +366,78 @@ class DiretorECoordenadorAreaTest {
         assertEquals(1, Objects.requireNonNull(response.getBody()).size());
         verify(alocacaoHorarioRepository).findAllMap();
     }
+
+    // =========================================================================
+    // CENÁRIO: Renovação semanal obrigatória de senha do Diretor (ciclo de 7 dias)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Diretor: Deve renovar obrigatoriamente a senha mantendo nome e e-mail opcionais e reiniciar ciclo de 7 dias")
+    void testRenovarCredenciaisDiretorApenasSenhaSucesso() {
+        Coordenador diretorExistente = Coordenador.builder()
+                .matricula("DIR001")
+                .nome("Dr. Roberto Lima")
+                .email("diretor@ifpb.edu.br")
+                .senha("senhaAntigaSegura")
+                .tipoCoordenador("DIRETOR")
+                .departamento("Campus")
+                .ultimaAlteracaoCredenciais(LocalDateTime.now().minusDays(7))
+                .build();
+
+        when(coordenadorRepository.findCoordenadorByMatricula("DIR001")).thenReturn(Optional.of(diretorExistente));
+
+        Map<String, String> payload = Map.of(
+                "matricula", "DIR001",
+                "novaSenha", "novaSenhaForte2026"
+        );
+
+        ResponseEntity<?> response = diretorController.atualizarCredenciais(payload);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertNotNull(body);
+        assertEquals("Dr. Roberto Lima", body.get("nome"));
+        assertEquals("diretor@ifpb.edu.br", body.get("email"));
+        assertEquals(7, body.get("diasRestantesCredenciais"));
+        assertEquals(false, body.get("credenciaisExpiradas"));
+        verify(coordenadorRepository).save(argThat(c ->
+                "novaSenhaForte2026".equals(c.getSenha()) &&
+                "Dr. Roberto Lima".equals(c.getNome()) &&
+                "diretor@ifpb.edu.br".equals(c.getEmail()) &&
+                c.getUltimaAlteracaoCredenciais() != null
+        ));
+        verify(logSistemaRepository).save(argThat(log ->
+                "DIR001".equals(log.getUsuarioMatricula()) &&
+                "diretor.credenciais.renovadas".equals(log.getAcao())
+        ));
+    }
+
+    @Test
+    @DisplayName("Diretor: Deve rejeitar renovação semanal caso a senha não mude ou seja igual à senha padrão 123456")
+    void testRejeitarRenovacaoSemTrocaDeSenha() {
+        Coordenador diretorExistente = Coordenador.builder()
+                .matricula("DIR001")
+                .nome("Dr. Roberto Lima")
+                .email("diretor@ifpb.edu.br")
+                .senha("senhaAtual123")
+                .tipoCoordenador("DIRETOR")
+                .build();
+
+        when(coordenadorRepository.findCoordenadorByMatricula("DIR001")).thenReturn(Optional.of(diretorExistente));
+
+        // 1. Tentativa com a mesma senha atual
+        ResponseEntity<?> respMesmaSenha = diretorController.atualizarCredenciais(Map.of(
+                "matricula", "DIR001",
+                "novaSenha", "senhaAtual123"
+        ));
+        assertEquals(HttpStatus.BAD_REQUEST, respMesmaSenha.getStatusCode());
+
+        // 2. Tentativa com a senha padrão 123456
+        ResponseEntity<?> respSenhaPadrao = diretorController.atualizarCredenciais(Map.of(
+                "matricula", "DIR001",
+                "novaSenha", "123456"
+        ));
+        assertEquals(HttpStatus.BAD_REQUEST, respSenhaPadrao.getStatusCode());
+        verify(coordenadorRepository, never()).save(any());
+    }
 }

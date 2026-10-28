@@ -38,6 +38,31 @@ export async function loginApi(email: string, senha: string) {
   return null;
 }
 
+export async function updateDiretorCredenciaisApi(payload: {
+  matricula?: string;
+  nome?: string;
+  email?: string;
+  emailAtual?: string;
+  senhaAtual?: string;
+  novaSenha: string;
+}): Promise<{ ok: boolean; data?: any; error?: string } | null> {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/diretor/credenciais`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      return { ok: true, data: await res.json() };
+    }
+    const errText = await res.text();
+    return { ok: false, error: errText || "Não foi possível atualizar as credenciais no servidor." };
+  } catch {
+    // Backend offline -> fallback local tratado pela store
+    return null;
+  }
+}
+
 // DOCENTES
 export async function fetchDocentesApi() {
   try {
