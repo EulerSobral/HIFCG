@@ -97,16 +97,29 @@ public class CoordenadorRepository {
             LocalDateTime ultimaAlt = coordenador.getUltimaAlteracaoCredenciais() != null
                     ? coordenador.getUltimaAlteracaoCredenciais()
                     : LocalDateTime.now();
-            String sql = "INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo, ultima_alteracao_credenciais) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-            jdbcTemplate.update(sql,
-                    coordenador.getMatricula(),
-                    coordenador.getNome(),
-                    coordenador.getEmail(),
-                    coordenador.getSenha(),
-                    coordenador.getTipoCoordenador(),
-                    coordenador.getDepartamento(),
-                    coordenador.getCursoCodigo(),
-                    Timestamp.valueOf(ultimaAlt));
+            try {
+                String sql = "INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo, ultima_alteracao_credenciais) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                jdbcTemplate.update(sql,
+                        coordenador.getMatricula(),
+                        coordenador.getNome(),
+                        coordenador.getEmail(),
+                        coordenador.getSenha(),
+                        coordenador.getTipoCoordenador(),
+                        coordenador.getDepartamento(),
+                        coordenador.getCursoCodigo(),
+                        Timestamp.valueOf(ultimaAlt));
+            } catch (Exception ex) {
+                ensureUltimaAlteracaoColumn();
+                String sqlFallback = "INSERT INTO coordenador (matricula, nome, email, senha, tipo_coordenador, departamento, curso_codigo) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                jdbcTemplate.update(sqlFallback,
+                        coordenador.getMatricula(),
+                        coordenador.getNome(),
+                        coordenador.getEmail(),
+                        coordenador.getSenha(),
+                        coordenador.getTipoCoordenador(),
+                        coordenador.getDepartamento(),
+                        coordenador.getCursoCodigo());
+            }
         }
     }
 
@@ -114,21 +127,53 @@ public class CoordenadorRepository {
         LocalDateTime ultimaAlt = coordenador.getUltimaAlteracaoCredenciais() != null
                 ? coordenador.getUltimaAlteracaoCredenciais()
                 : LocalDateTime.now();
-        String sql = "UPDATE coordenador SET nome = ?, email = ?, senha = ?, departamento = ?, curso_codigo = ?, tipo_coordenador = ?, ultima_alteracao_credenciais = ? WHERE matricula = ?";
-        jdbcTemplate.update(sql,
-                coordenador.getNome(),
-                coordenador.getEmail(),
-                coordenador.getSenha(),
-                coordenador.getDepartamento(),
-                coordenador.getCursoCodigo(),
-                coordenador.getTipoCoordenador(),
-                Timestamp.valueOf(ultimaAlt),
-                coordenador.getMatricula());
+        try {
+            String sql = "UPDATE coordenador SET nome = ?, email = ?, senha = ?, departamento = ?, curso_codigo = ?, tipo_coordenador = ?, ultima_alteracao_credenciais = ? WHERE matricula = ?";
+            jdbcTemplate.update(sql,
+                    coordenador.getNome(),
+                    coordenador.getEmail(),
+                    coordenador.getSenha(),
+                    coordenador.getDepartamento(),
+                    coordenador.getCursoCodigo(),
+                    coordenador.getTipoCoordenador(),
+                    Timestamp.valueOf(ultimaAlt),
+                    coordenador.getMatricula());
+        } catch (Exception ex) {
+            ensureUltimaAlteracaoColumn();
+            String sqlFallback = "UPDATE coordenador SET nome = ?, email = ?, senha = ?, departamento = ?, curso_codigo = ?, tipo_coordenador = ? WHERE matricula = ?";
+            jdbcTemplate.update(sqlFallback,
+                    coordenador.getNome(),
+                    coordenador.getEmail(),
+                    coordenador.getSenha(),
+                    coordenador.getDepartamento(),
+                    coordenador.getCursoCodigo(),
+                    coordenador.getTipoCoordenador(),
+                    coordenador.getMatricula());
+        }
     }
 
     public void updateSenhaByEmail(String email, String senha) {
-        String sql = "UPDATE coordenador SET senha = ?, ultima_alteracao_credenciais = CURRENT_TIMESTAMP WHERE email = ?";
-        jdbcTemplate.update(sql, senha, email);
+        try {
+            String sql = "UPDATE coordenador SET senha = ?, ultima_alteracao_credenciais = CURRENT_TIMESTAMP WHERE email = ?";
+            jdbcTemplate.update(sql, senha, email);
+        } catch (Exception ex) {
+            ensureUltimaAlteracaoColumn();
+            String sqlFallback = "UPDATE coordenador SET senha = ? WHERE email = ?";
+            jdbcTemplate.update(sqlFallback, senha, email);
+        }
+    }
+
+    private void ensureUltimaAlteracaoColumn() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE coordenador ADD COLUMN IF NOT EXISTS ultima_alteracao_credenciais TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL");
+        } catch (Exception ignored) {
+        }
+    }
+
+    public Optional<Coordenador> findPrimeiroDiretor() {
+        String sql = "SELECT * FROM coordenador WHERE UPPER(tipo_coordenador) = 'DIRETOR'";
+        List<Coordenador> list = jdbcTemplate.query(sql, this::mapRow);
+        return list.stream().findFirst();
     }
 
     public Optional<Coordenador> findCoordenadorByMatricula(String matricula) {

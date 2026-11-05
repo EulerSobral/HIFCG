@@ -119,6 +119,9 @@ public class ApiController {
                 opt = coordenadorRepository.findByEmailObject(body.get("email"));
             }
             if (opt.isEmpty()) {
+                opt = coordenadorRepository.findPrimeiroDiretor();
+            }
+            if (opt.isEmpty()) {
                 return ResponseEntity.status(404).body("Usuário Diretor não encontrado.");
             }
 

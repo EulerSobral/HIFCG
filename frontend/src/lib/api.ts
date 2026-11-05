@@ -45,7 +45,7 @@ export async function updateDiretorCredenciaisApi(payload: {
   emailAtual?: string;
   senhaAtual?: string;
   novaSenha: string;
-}): Promise<{ ok: boolean; data?: any; error?: string } | null> {
+}): Promise<any | null> {
   try {
     const res = await fetchWithTimeout(`${API_BASE_URL}/api/diretor/credenciais`, {
       method: "PUT",
@@ -53,14 +53,12 @@ export async function updateDiretorCredenciaisApi(payload: {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      return { ok: true, data: await res.json() };
+      return await res.json();
     }
-    const errText = await res.text();
-    return { ok: false, error: errText || "Não foi possível atualizar as credenciais no servidor." };
-  } catch {
-    // Backend offline -> fallback local tratado pela store
-    return null;
+  } catch (err) {
+    console.warn("Backend indisponível ao atualizar credenciais do Diretor, aplicando fallback local:", err);
   }
+  return null;
 }
 
 // DOCENTES

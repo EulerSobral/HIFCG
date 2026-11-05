@@ -29,6 +29,7 @@ function Page() {
   const renovarCredenciaisDiretor = useStore((s) => s.renovarCredenciaisDiretor);
   const [open, setOpen] = useState(false);
   const [openSelfEdit, setOpenSelfEdit] = useState(false);
+  const [erroSelfEdit, setErroSelfEdit] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("coord_curso");
   const [cursoId, setCursoId] = useState(cursos[0]?.id ?? "");
   const statusDiretor = getStatusCredenciaisDiretor(me);
@@ -58,6 +59,7 @@ function Page() {
   const submitSelfEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!me) return;
+    setErroSelfEdit(null);
     const f = new FormData(e.currentTarget);
     const nome = String(f.get("nome") || "").trim();
     const email = String(f.get("email") || "").trim();
@@ -65,7 +67,9 @@ function Page() {
 
     if (me.role === "diretor") {
       if (!novaSenha) {
-        toast.error("Para o perfil Diretor, a alteração da senha é obrigatória para renovar o período de 1 semana.");
+        const msg = "Para o perfil Diretor, a alteração da senha é obrigatória para renovar o período de 1 semana.";
+        setErroSelfEdit(msg);
+        toast.error(msg);
         return;
       }
       const res = await renovarCredenciaisDiretor({
@@ -74,11 +78,14 @@ function Page() {
         novaSenha,
       });
       if (!res.ok) {
-        toast.error(res.error || "Erro ao renovar credenciais do Diretor.");
+        const msg = res.error || "Erro ao renovar credenciais do Diretor.";
+        setErroSelfEdit(msg);
+        toast.error(msg);
         return;
       }
-      toast.success("Senha do Diretor renovada com sucesso! Prazo de 7 dias reiniciado.");
+      setErroSelfEdit(null);
       setOpenSelfEdit(false);
+      toast.success("Senha do Diretor renovada com sucesso! Prazo de 7 dias reiniciado.");
       return;
     }
 
@@ -88,8 +95,8 @@ function Page() {
     if (novaSenha) {
       await setUserPassword(me.id, novaSenha);
     }
-    toast.success("Credenciais alteradas com sucesso");
     setOpenSelfEdit(false);
+    toast.success("Credenciais alteradas com sucesso");
   };
 
   const resetPassword = async (u: User) => {
@@ -104,7 +111,13 @@ function Page() {
         description="Gerenciamento de contas de coordenadores e credenciais de acesso."
         action={
           <div className="flex items-center gap-2">
-            <Dialog open={openSelfEdit} onOpenChange={setOpenSelfEdit}>
+            <Dialog
+              open={openSelfEdit}
+              onOpenChange={(next) => {
+                if (!next) setErroSelfEdit(null);
+                setOpenSelfEdit(next);
+              }}
+            >
               <DialogTrigger asChild>
                 <Button variant={allowedToCreate.length === 0 ? "default" : "outline"}>
                   <KeyRound className="h-4 w-4 mr-2" />
@@ -116,6 +129,11 @@ function Page() {
                   <DialogTitle>Alterar minhas credenciais</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={submitSelfEdit} className="space-y-4">
+                  {erroSelfEdit && (
+                    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive font-medium">
+                      {erroSelfEdit}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>
                       {me?.role === "diretor" ? "Nova senha (obrigatória no ciclo de 7 dias) *" : "Nova senha (opcional)"}

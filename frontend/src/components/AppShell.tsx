@@ -52,16 +52,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const renovarCredenciaisDiretor = useStore((s) => s.renovarCredenciaisDiretor);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [openRenovacaoModal, setOpenRenovacaoModal] = useState(false);
+  const [renovadoNestaSessao, setRenovadoNestaSessao] = useState(false);
+  const [erroRenovacao, setErroRenovacao] = useState<string | null>(null);
 
   if (!user) return null;
 
   const items = nav.filter((n) => (n.roles as readonly string[]).includes(user.role));
   const statusDiretor = getStatusCredenciaisDiretor(user);
-  const modalObrigatorio = statusDiretor.isDiretor && statusDiretor.expirado;
+  const modalObrigatorio = statusDiretor.isDiretor && statusDiretor.expirado && !renovadoNestaSessao;
   const dialogAberto = modalObrigatorio || openRenovacaoModal;
 
   const handleRenovarSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErroRenovacao(null);
     const f = new FormData(e.currentTarget);
     const nome = String(f.get("nome") || "").trim();
     const email = String(f.get("email") || "").trim();
@@ -69,11 +72,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     const confirmarSenha = String(f.get("confirmarSenha") || "").trim();
 
     if (!novaSenha) {
-      toast.error("A nova senha é obrigatória para renovar o ciclo de 1 semana.");
+      const msg = "A nova senha é obrigatória para renovar o ciclo de 1 semana.";
+      setErroRenovacao(msg);
+      toast.error(msg);
       return;
     }
     if (novaSenha !== confirmarSenha) {
-      toast.error("A confirmação da nova senha não confere.");
+      const msg = "A confirmação da nova senha não confere.";
+      setErroRenovacao(msg);
+      toast.error(msg);
       return;
     }
 
@@ -84,12 +91,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      toast.error(res.error || "Não foi possível atualizar as credenciais.");
+      const msg = res.error || "Não foi possível atualizar as credenciais.";
+      setErroRenovacao(msg);
+      toast.error(msg);
       return;
     }
 
-    toast.success("Senha e credenciais renovadas com sucesso! Novo ciclo de 7 dias iniciado.");
+    setErroRenovacao(null);
+    setRenovadoNestaSessao(true);
     setOpenRenovacaoModal(false);
+    toast.success("Senha e credenciais renovadas com sucesso! Novo ciclo de 7 dias iniciado.");
   };
 
   return (
@@ -187,7 +198,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Button
               size="sm"
               variant={statusDiretor.expirado || statusDiretor.emPeriodoDeAviso ? "default" : "outline"}
-              onClick={() => setOpenRenovacaoModal(true)}
+              onClick={() => {
+                setErroRenovacao(null);
+                setOpenRenovacaoModal(true);
+              }}
             >
               <KeyRound className="h-3.5 w-3.5 mr-1.5" />
               Alterar senha / credenciais
@@ -199,6 +213,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           open={dialogAberto}
           onOpenChange={(nextOpen) => {
             if (modalObrigatorio && !nextOpen) return;
+            if (!nextOpen) setErroRenovacao(null);
             setOpenRenovacaoModal(nextOpen);
           }}
         >
@@ -217,6 +232,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleRenovarSubmit} className="space-y-4">
+              {erroRenovacao && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive font-medium">
+                  {erroRenovacao}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="dir-nova-senha">Nova senha (obrigatória) *</Label>

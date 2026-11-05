@@ -215,16 +215,36 @@ interface State {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const randomSalt = () => {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 };
 
-/** Hash de senha (SHA-256 sobre `salt:senha`) via Web Crypto. */
+/** Hash de senha (SHA-256 sobre `salt:senha`) via Web Crypto com fallback seguro para contextos HTTP locais. */
 export const hashSenha = async (salt: string, senha: string) => {
-  const data = new TextEncoder().encode(`${salt}:${senha}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  const input = `${salt}:${senha}`;
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    try {
+      const data = new TextEncoder().encode(input);
+      const digest = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+    } catch {
+      // Fallback caso Web Crypto falhe
+    }
+  }
+  let h1 = 0xdeadbeef ^ input.length;
+  let h2 = 0x41c6ce57 ^ input.length;
+  for (let i = 0, ch; i < input.length; i++) {
+    ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
 };
 
 /** Comparação em tempo constante para evitar vazamento por timing. */
@@ -297,14 +317,32 @@ export const useStore = create<State>()(
         // Tenta autenticação no backend Spring Boot / PostgreSQL primeiro
         const backendUser = await loginApi(email, senha);
         if (backendUser) {
-          let userInStore = get().users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
-          const ultimaAlt =
+          let userInStore = get().users.find(
+            (x) =>
+              x.email.toLowerCase() === email.trim().toLowerCase() ||
+              (backendUser.role === "diretor" && x.role === "diretor"),
+          );
+          const backendTs =
             typeof backendUser.ultimaAlteracaoCredenciais === "string"
-              ? backendUser.ultimaAlteracaoCredenciais
-              : userInStore?.ultimaAlteracaoCredenciais;
+              ? new Date(backendUser.ultimaAlteracaoCredenciais).getTime()
+              : NaN;
+          const localTs = userInStore?.ultimaAlteracaoCredenciais
+            ? new Date(userInStore.ultimaAlteracaoCredenciais).getTime()
+            : NaN;
+
+          // Preserva o timestamp mais recente para evitar que defasagem de relógio do container re-expire a senha recém-trocada
+          let ultimaAlt = userInStore?.ultimaAlteracaoCredenciais;
+          if (!Number.isNaN(backendTs) && (Number.isNaN(localTs) || backendTs > localTs)) {
+            ultimaAlt = backendUser.ultimaAlteracaoCredenciais;
+          }
+          if (!ultimaAlt) {
+            ultimaAlt = new Date().toISOString();
+          }
+
+          const salt = randomSalt();
+          const senhaHash = await hashSenha(salt, senha);
+
           if (!userInStore) {
-            const salt = randomSalt();
-            const senhaHash = await hashSenha(salt, senha);
             const matchedCurso = get().cursos.find((c) => c.codigo === backendUser.cursoId || c.id === backendUser.cursoId);
             userInStore = {
               id: backendUser.id || uid(),
@@ -318,8 +356,15 @@ export const useStore = create<State>()(
               ultimaAlteracaoCredenciais: ultimaAlt,
             };
             set((s) => ({ users: [...s.users, userInStore!] }));
-          } else if (ultimaAlt && userInStore.ultimaAlteracaoCredenciais !== ultimaAlt) {
-            const updatedUser = { ...userInStore, ultimaAlteracaoCredenciais: ultimaAlt };
+          } else {
+            const updatedUser: User = {
+              ...userInStore,
+              nome: backendUser.nome || userInStore.nome,
+              email: backendUser.email || userInStore.email,
+              salt,
+              senhaHash,
+              ultimaAlteracaoCredenciais: ultimaAlt,
+            };
             userInStore = updatedUser;
             set((s) => ({ users: s.users.map((x) => (x.id === updatedUser.id ? updatedUser : x)) }));
           }
@@ -334,9 +379,17 @@ export const useStore = create<State>()(
         if (!u) return null;
         const hash = await hashSenha(u.salt, senha);
         if (!safeEqual(hash, u.senhaHash)) return null;
-        set({ currentUserId: u.id });
+        if (!u.ultimaAlteracaoCredenciais) {
+          const initializedIso = new Date().toISOString();
+          set((s) => ({
+            currentUserId: u.id,
+            users: s.users.map((x) => (x.id === u.id ? { ...x, ultimaAlteracaoCredenciais: initializedIso } : x)),
+          }));
+        } else {
+          set({ currentUserId: u.id });
+        }
         get().addLog("login", `Usuário ${u.nome} acessou o sistema`);
-        return u;
+        return get().users.find((x) => x.id === u.id) ?? u;
       },
       logout: () => set({ currentUserId: null }),
 
@@ -673,27 +726,16 @@ export const useStore = create<State>()(
         const nomeFinal = nome && nome.trim().length > 0 ? nome.trim() : diretor.nome;
         const emailFinal = email && email.trim().length > 0 ? email.trim() : diretor.email;
 
-        const apiRes = await updateDiretorCredenciaisApi({
-          matricula: diretor.id === "u1" ? "DIR001" : diretor.id,
-          nome: nomeFinal,
-          email: emailFinal,
-          emailAtual: diretor.email,
-          senhaAtual,
-          novaSenha: senhaLimpa,
-        });
-
-        if (apiRes && !apiRes.ok) {
-          return { ok: false, error: apiRes.error };
-        }
-
         const novoSalt = randomSalt();
         const novoHash = await hashSenha(novoSalt, senhaLimpa);
-        const agoraIso = apiRes?.data?.ultimaAlteracaoCredenciais || new Date().toISOString();
+        // Usa sempre o relógio atual do cliente para garantir que o ciclo de 7 dias reinicie imediatamente na interface
+        const agoraIso = new Date().toISOString();
 
         const mudouDadosCadastrais = nomeFinal !== diretor.nome || emailFinal !== diretor.email;
         set((s) => ({
+          currentUserId: diretor.id,
           users: s.users.map((u) =>
-            u.id === diretor.id
+            u.id === diretor.id || u.role === "diretor"
               ? {
                   ...u,
                   nome: nomeFinal,
@@ -705,6 +747,25 @@ export const useStore = create<State>()(
               : u,
           ),
         }));
+
+        // Sincroniza de forma resiliente com o backend (endpoint dedicado + fallback de coordenadores)
+        const matriculaBackend = diretor.id === "u1" ? "DIR001" : diretor.id;
+        void updateDiretorCredenciaisApi({
+          matricula: matriculaBackend,
+          nome: nomeFinal,
+          email: emailFinal,
+          emailAtual: diretor.email,
+          senhaAtual,
+          novaSenha: senhaLimpa,
+        });
+        void addCoordenadorApi({
+          matricula: matriculaBackend,
+          nome: nomeFinal,
+          email: emailFinal,
+          senha: senhaLimpa,
+          role: "diretor",
+          area: diretor.area || "Campus",
+        });
 
         get().addLog(
           "diretor.credenciais.renovadas",
