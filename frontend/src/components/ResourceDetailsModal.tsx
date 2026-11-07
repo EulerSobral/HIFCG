@@ -1,7 +1,7 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useStore, DIAS, SLOTS_HORARIOS } from "@/lib/store";
+import { useStore, useActivePeriodo, DIAS, SLOTS_HORARIOS } from "@/lib/store";
 import { User, MapPin, Mail, Hash, BookOpen, Layers, Users } from "lucide-react";
 
 interface ResourceDetailsModalProps {
@@ -12,6 +12,8 @@ interface ResourceDetailsModalProps {
 
 export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: ResourceDetailsModalProps) {
   const s = useStore();
+  const activePeriodoObj = useActivePeriodo();
+  const periodoLetivoAtivo = activePeriodoObj?.nome || "2026.1";
 
   const docente = s.docentes.find((d) => d.id === docenteId) ?? null;
   const ambiente = s.ambientes.find((a) => a.id === ambienteId) ?? null;
@@ -19,11 +21,11 @@ export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: Resourc
   const isOpen = !!docente || !!ambiente;
 
   const alocacoesDocente = docente
-    ? s.alocacoes.filter((a) => a.docenteId === docente.id)
+    ? s.alocacoes.filter((a) => a.docenteId === docente.id && (a.periodoLetivo || "2026.1") === periodoLetivoAtivo)
     : [];
 
   const alocacoesAmbiente = ambiente
-    ? s.alocacoes.filter((a) => a.ambienteId === ambiente.id)
+    ? s.alocacoes.filter((a) => a.ambienteId === ambiente.id && (a.periodoLetivo || "2026.1") === periodoLetivoAtivo)
     : [];
 
   return (
@@ -65,7 +67,7 @@ export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: Resourc
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                 <BookOpen className="h-4 w-4 text-primary" />
-                Grade Semanal do Docente
+                Grade Semanal do Docente ({periodoLetivoAtivo})
               </h4>
               <ScheduleGrid
                 alocacoes={alocacoesDocente}
@@ -75,7 +77,7 @@ export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: Resourc
                   const curso = s.cursos.find((c) => c.id === a.cursoId);
                   return (
                     <div className="text-[11px] leading-tight space-y-0.5">
-                      <div className="font-bold text-primary">{disc?.codigo ?? disc?.nome}</div>
+                      <div className="font-bold text-primary">{disc?.nome ?? disc?.codigo}</div>
                       <div className="text-muted-foreground truncate">{curso?.codigo} ({a.periodoCurso}º per)</div>
                       <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{amb?.codigo}</div>
                     </div>
@@ -131,7 +133,7 @@ export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: Resourc
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                 <BookOpen className="h-4 w-4 text-primary" />
-                Ocupação do Ambiente
+                Ocupação do Ambiente ({periodoLetivoAtivo})
               </h4>
               <ScheduleGrid
                 alocacoes={alocacoesAmbiente}
@@ -141,7 +143,7 @@ export function ResourceDetailsModal({ docenteId, ambienteId, onClose }: Resourc
                   const curso = s.cursos.find((c) => c.id === a.cursoId);
                   return (
                     <div className="text-[11px] leading-tight space-y-0.5">
-                      <div className="font-bold text-primary">{disc?.codigo ?? disc?.nome}</div>
+                      <div className="font-bold text-primary">{disc?.nome ?? disc?.codigo}</div>
                       <div className="text-muted-foreground truncate">{doc?.nome}</div>
                       <div className="text-[10px] text-muted-foreground">{curso?.codigo} ({a.periodoCurso}º per)</div>
                     </div>

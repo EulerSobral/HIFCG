@@ -137,6 +137,37 @@ class CoordenadorCursoIntegrationTest {
                 .andExpect(content().string(containsString("Recurso excluído com sucesso pelo Coordenador de Curso!")));
 
         assertFalse(ambienteRepository.existsByCodigo("LAB-CURSO-01"));
+
+        // 4. Cadastrar Disciplina sem digitar código (geração automática) e com quantidade de aulas semanais
+        Map<String, Object> discAuto = Map.of(
+                "nome", "Estrutura de Dados",
+                "aulasSemanais", 4,
+                "cargaHoraria", 80,
+                "periodo", 2,
+                "curso", "TADS"
+        );
+
+        mockMvc.perform(post("/api/disciplinas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(discAuto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codigo", is("EST201")))
+                .andExpect(jsonPath("$.aulasSemanais", is(4)));
+
+        // 5. Impedir cadastro de mesmo código para disciplinas distintas
+        Map<String, Object> discDuplicada = Map.of(
+                "codigo", "MAT101",
+                "nome", "Outra Disciplina Distinta",
+                "aulasSemanais", 3,
+                "cargaHoraria", 60,
+                "curso", "TADS"
+        );
+
+        mockMvc.perform(post("/api/disciplinas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(discDuplicada)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("Já existe uma disciplina cadastrada com o código")));
     }
 
     // =========================================================================

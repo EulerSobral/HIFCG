@@ -163,6 +163,18 @@ export async function addDisciplinaApi(d: any) {
   return null;
 }
 
+export async function updateDisciplinaApi(codigo: string, d: any) {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/disciplinas/${encodeURIComponent(codigo)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
+    });
+    if (res.ok) return await res.json();
+  } catch {}
+  return null;
+}
+
 export async function removeDisciplinaApi(codigo: string) {
   try {
     await fetchWithTimeout(`${API_BASE_URL}/api/disciplinas/${codigo}`, { method: "DELETE" });
@@ -238,6 +250,7 @@ export async function addAlocacaoApi(a: {
   ambiente: string;
   turma: string;
   periodo: string | number;
+  periodoLetivo?: string;
   diaSemana: string;
   horarioInicio: string;
   horarioFim: string;
@@ -259,6 +272,7 @@ export async function removeAlocacaoApi(a: {
   ambiente: string;
   turma: string;
   periodo: string | number;
+  periodoLetivo?: string;
   diaSemana: string;
   horarioInicio: string;
   horarioFim: string;

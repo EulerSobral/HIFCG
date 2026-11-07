@@ -100,12 +100,29 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
                 String cursoNome = dados.get("curso") != null ? dados.get("curso").toString() : "";
                 List<Curso> cursos = cursoRepository.findByNomeContainingIgnoreCase(cursoNome);
                 Curso cursoEncontrado = cursos.isEmpty() ? null : cursos.get(0);
+                String cursoFinal = cursoEncontrado != null ? cursoEncontrado.getCodigo() : (cursoNome.isEmpty() ? "TADS" : cursoNome);
+                String nomeDisc = dados.get("nome") != null ? dados.get("nome").toString() : "Nova Disciplina";
+                int periodoDisc = dados.get("periodo") != null ? Integer.parseInt(dados.get("periodo").toString()) : 1;
+                int chDisc = dados.get("cargaHoraria") != null ? Integer.parseInt(dados.get("cargaHoraria").toString()) : 60;
+                int aulasSemDisc = dados.get("aulasSemanais") != null
+                        ? Integer.parseInt(dados.get("aulasSemanais").toString())
+                        : Math.max(1, chDisc / 20);
+
+                String codigoInformado = dados.get("codigo") != null ? dados.get("codigo").toString().trim().toUpperCase() : "";
+                if (!codigoInformado.isEmpty() && disciplinaRepository.existsByCodigo(codigoInformado)) {
+                    throw new IllegalArgumentException("Já existe uma disciplina cadastrada com o código: " + codigoInformado);
+                }
+                String codigoFinal = codigoInformado.isEmpty()
+                        ? disciplinaRepository.gerarCodigoUnico(nomeDisc, cursoFinal, periodoDisc)
+                        : codigoInformado;
 
                 Disciplina disciplina = Disciplina.builder()
-                        .codigo(dados.get("codigo") != null ? dados.get("codigo").toString() : null)
-                        .nome(dados.get("nome") != null ? dados.get("nome").toString() : null)
-                        .cargaHoraria(dados.get("cargaHoraria") != null ? Integer.parseInt(dados.get("cargaHoraria").toString()) : 0)
-                        .curso(cursoEncontrado != null ? cursoEncontrado.getCodigo() : cursoNome)
+                        .codigo(codigoFinal)
+                        .nome(nomeDisc)
+                        .cargaHoraria(chDisc)
+                        .aulasSemanais(aulasSemDisc)
+                        .periodo(periodoDisc)
+                        .curso(cursoFinal)
                         .build();
                 disciplinaRepository.save(disciplina);
                 break;
@@ -145,6 +162,8 @@ public class CoordenadorDepartamentoService implements CoordenadorFactory, Recur
                 disciplinaRepository.findByCodigo(codigo).ifPresentOrElse(disciplina -> {
                     if (dados.containsKey("nome")) disciplina.setNome(dados.get("nome").toString());
                     if (dados.containsKey("cargaHoraria")) disciplina.setCargaHoraria(Integer.parseInt(dados.get("cargaHoraria").toString()));
+                    if (dados.containsKey("aulasSemanais")) disciplina.setAulasSemanais(Integer.parseInt(dados.get("aulasSemanais").toString()));
+                    if (dados.containsKey("periodo")) disciplina.setPeriodo(Integer.parseInt(dados.get("periodo").toString()));
                     disciplinaRepository.save(disciplina);
                 }, () -> { throw new RuntimeException("Disciplina não encontrada: " + codigo); });
                 break;

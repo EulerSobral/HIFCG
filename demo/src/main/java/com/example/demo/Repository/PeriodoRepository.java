@@ -52,6 +52,10 @@ public class PeriodoRepository {
     }
 
     public void save(Periodo p) {
+        // Garante que apenas um período letivo fique ativo por vez
+        if (p.isAtivo()) {
+            jdbcTemplate.update("UPDATE periodo SET ativo = FALSE WHERE codigo <> ?", p.getCodigo());
+        }
         if (existsByCodigo(p.getCodigo())) {
             String sql = "UPDATE periodo SET nome = ?, inicio = ?, fim = ?, inicio_matricula = ?, fim_matricula = ?, ativo = ? WHERE codigo = ?";
             jdbcTemplate.update(sql, p.getNome(), p.getInicio(), p.getFim(), p.getInicioMatricula(), p.getFimMatricula(), p.isAtivo(), p.getCodigo());

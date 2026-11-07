@@ -6,8 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/Combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { ResourceDetailsModal } from "@/components/ResourceDetailsModal";
-import { DIAS, SLOTS_HORARIOS, getTurnosParaCurso, useStore, type Alocacao } from "@/lib/store";
+import { DIAS, SLOTS_HORARIOS, getTurnosParaCurso, useStore, useActivePeriodo, type Alocacao } from "@/lib/store";
+import { CalendarRange } from "lucide-react";
 
 export const Route = createFileRoute("/_app/visualizar")({
   head: () => ({ meta: [{ title: "Visualizar Horários · HIFCG" }] }),
@@ -16,6 +18,8 @@ export const Route = createFileRoute("/_app/visualizar")({
 
 function Page() {
   const s = useStore();
+  const activePeriodoObj = useActivePeriodo();
+  const periodoLetivoAtivo = activePeriodoObj?.nome || "2026.1";
   const [cursoId, setCursoId] = useState(s.cursos[0]?.id ?? "");
   const selectedCurso = useMemo(() => s.cursos.find((c) => c.id === cursoId), [s.cursos, cursoId]);
   const [periodoCurso, setPeriodoCurso] = useState<number>(1);
@@ -35,7 +39,16 @@ function Page() {
 
   return (
     <div>
-      <PageHeader title="Visualizar horários" description="Por curso, docente, ambiente ou período do curso. Clique no docente ou ambiente para ver a agenda detalhada." />
+      <PageHeader
+        title="Visualizar horários"
+        description="Por curso, docente, ambiente ou período do curso. Clique no docente ou ambiente para ver a agenda detalhada."
+        actions={
+          <Badge variant="default" className="text-xs px-3 py-1 gap-1.5">
+            <CalendarRange className="h-3.5 w-3.5" />
+            Período Letivo Ativo: {periodoLetivoAtivo}
+          </Badge>
+        }
+      />
       <Tabs defaultValue="curso">
         <TabsList>
           <TabsTrigger value="curso">Por curso e período</TabsTrigger>
@@ -65,7 +78,7 @@ function Page() {
             </div>
           </div>
           <Grid
-            filter={(a) => a.cursoId === cursoId && a.periodoCurso === periodoCurso}
+            filter={(a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo && a.cursoId === cursoId && a.periodoCurso === periodoCurso}
             showCurso={false}
             turnosVisiveis={turnosCurso}
             onSelectDocente={setDetailsDocenteId}
@@ -83,7 +96,7 @@ function Page() {
             />
           </div>
           <Grid
-            filter={(a) => a.docenteId === docenteId}
+            filter={(a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo && a.docenteId === docenteId}
             showCurso
             onSelectDocente={setDetailsDocenteId}
             onSelectAmbiente={setDetailsAmbienteId}
@@ -100,7 +113,7 @@ function Page() {
             />
           </div>
           <Grid
-            filter={(a) => a.ambienteId === ambienteId}
+            filter={(a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo && a.ambienteId === ambienteId}
             showCurso
             onSelectDocente={setDetailsDocenteId}
             onSelectAmbiente={setDetailsAmbienteId}
@@ -117,7 +130,7 @@ function Page() {
             </Select>
           </div>
           <Grid
-            filter={(a) => a.periodoCurso === periodoGeral}
+            filter={(a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo && a.periodoCurso === periodoGeral}
             showCurso
             onSelectDocente={setDetailsDocenteId}
             onSelectAmbiente={setDetailsAmbienteId}
@@ -196,7 +209,7 @@ function Grid({
                                 const curso = s.cursos.find((x) => x.id === a.cursoId);
                                 return (
                                   <div key={a.id} className="rounded-md bg-primary/10 border border-primary/30 p-2 shadow-xs space-y-0.5">
-                                    <div className="font-semibold text-foreground">{d?.codigo ?? d?.nome}</div>
+                                    <div className="font-semibold text-foreground leading-tight">{d?.nome ?? d?.codigo}</div>
                                     <div>
                                       <button
                                         type="button"

@@ -14,6 +14,7 @@ import {
   removeCursoApi,
   fetchDisciplinasApi,
   addDisciplinaApi,
+  updateDisciplinaApi,
   removeDisciplinaApi,
   fetchPeriodosApi,
   addPeriodoApi,
@@ -127,7 +128,69 @@ export interface Disciplina {
   nome: string;
   cursoId: string;
   periodo: number;
+  aulasSemanais: number;
   cargaHoraria: number;
+  /** Docente (professor) vinculado à disciplina antes da alocação de horário */
+  docenteId?: string;
+}
+
+const STOP_WORDS_DISCIPLINA = new Set([
+  "DE", "DA", "DO", "DAS", "DOS", "E", "EM", "PARA", "COM", "A", "O", "AS", "OS", "AO", "NA", "NO",
+  "I", "II", "III", "IV", "V", "VI",
+]);
+
+export function isCodigoDisciplinaDuplicado(
+  codigo: string,
+  disciplinasExistentes: Disciplina[],
+  ignoreId?: string,
+): boolean {
+  const limpo = (codigo || "").trim().toUpperCase();
+  if (!limpo) return false;
+  return disciplinasExistentes.some(
+    (d) => d.id !== ignoreId && d.codigo.trim().toUpperCase() === limpo,
+  );
+}
+
+export function gerarCodigoDisciplina(
+  nome: string,
+  cursoCodigoOuId: string,
+  periodo: number,
+  disciplinasExistentes: Disciplina[],
+  ignoreId?: string,
+): string {
+  const base = (nome || "").trim() || (cursoCodigoOuId || "DIS");
+  const semAcento = base
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g, " ")
+    .trim();
+
+  const palavras = semAcento
+    .split(/\s+/)
+    .filter((p) => p.length > 0 && !STOP_WORDS_DISCIPLINA.has(p));
+
+  let letras = palavras.join("");
+  if (letras.length < 3) {
+    const fallbackCurso = (cursoCodigoOuId || "DIS")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "");
+    letras = (letras + fallbackCurso + "DIS").slice(0, 3);
+  }
+  const prefixo = letras.slice(0, 3);
+  const per = Number.isFinite(periodo) && periodo > 0 ? Math.min(16, Math.floor(periodo)) : 1;
+
+  let seq = 1;
+  while (seq < 1000) {
+    const candidato = `${prefixo}${per}${String(seq).padStart(2, "0")}`;
+    if (!isCodigoDisciplinaDuplicado(candidato, disciplinasExistentes, ignoreId)) {
+      return candidato;
+    }
+    seq++;
+  }
+  return `${prefixo}${per}${Math.floor(100 + Math.random() * 900)}`;
 }
 
 export interface Periodo {
@@ -147,6 +210,8 @@ export interface Alocacao {
   ambienteId: string;
   cursoId: string;
   periodoCurso: number;
+  /** Nome/código do período letivo (ex.: "2026.1", "2025.2") ao qual pertence esta alocação */
+  periodoLetivo: string;
   dia: number; // 0=Seg .. 5=Sáb
   horario: string; // "08:00-09:40"
 }
@@ -189,12 +254,13 @@ interface State {
   updateCurso: (id: string, c: Partial<Curso>) => void;
   removeCurso: (id: string) => void;
 
-  addDisciplina: (d: Omit<Disciplina, "id">) => void;
-  updateDisciplina: (id: string, d: Partial<Disciplina>) => void;
+  addDisciplina: (d: Omit<Disciplina, "id" | "codigo"> & { codigo?: string }) => { ok: boolean; codigo: string; error?: string };
+  updateDisciplina: (id: string, d: Partial<Disciplina>) => { ok: boolean; error?: string };
   removeDisciplina: (id: string) => void;
 
   addPeriodo: (p: Omit<Periodo, "id">) => void;
   updatePeriodo: (id: string, p: Partial<Periodo>) => void;
+  ativarPeriodo: (id: string) => void;
   removePeriodo: (id: string) => void;
 
   addUser: (u: Omit<User, "id" | "salt" | "senhaHash"> & { senha: string }) => Promise<void>;
@@ -208,7 +274,7 @@ interface State {
   }) => Promise<{ ok: boolean; error?: string }>;
   removeUser: (id: string) => void;
 
-  setAlocacao: (a: Omit<Alocacao, "id"> & { id?: string }) => string | null;
+  setAlocacao: (a: Omit<Alocacao, "id" | "periodoLetivo"> & { id?: string; periodoLetivo?: string }) => string | null;
   removeAlocacao: (id: string) => void;
 }
 
@@ -289,10 +355,10 @@ const seedCursos: Curso[] = [
 ];
 
 const seedDisciplinas: Disciplina[] = [
-  { id: "di1", codigo: "MAT101", nome: "Matemática Discreta", cursoId: "c1", periodo: 1, cargaHoraria: 80 },
-  { id: "di2", codigo: "PRG101", nome: "Programação I", cursoId: "c1", periodo: 1, cargaHoraria: 80 },
-  { id: "di3", codigo: "BD101", nome: "Banco de Dados", cursoId: "c1", periodo: 2, cargaHoraria: 60 },
-  { id: "di4", codigo: "RED101", nome: "Redes de Computadores", cursoId: "c2", periodo: 1, cargaHoraria: 60 },
+  { id: "di1", codigo: "MAT101", nome: "Matemática Discreta", cursoId: "c1", periodo: 1, aulasSemanais: 4, cargaHoraria: 80, docenteId: "d1" },
+  { id: "di2", codigo: "PRG101", nome: "Programação I", cursoId: "c1", periodo: 1, aulasSemanais: 4, cargaHoraria: 80, docenteId: "d2" },
+  { id: "di3", codigo: "BD101", nome: "Banco de Dados", cursoId: "c1", periodo: 2, aulasSemanais: 3, cargaHoraria: 60, docenteId: "d3" },
+  { id: "di4", codigo: "RED101", nome: "Redes de Computadores", cursoId: "c2", periodo: 1, aulasSemanais: 3, cargaHoraria: 60, docenteId: "d2" },
 ];
 
 const seedPeriodos: Periodo[] = [
@@ -480,18 +546,25 @@ export const useStore = create<State>()(
             ? dbDisciplinas.map((d: any) => {
                 const ex = current.disciplinas.find((x) => x.codigo === d.codigo);
                 const matchedCurso = nextCursos.find((c) => c.codigo === d.curso || c.id === d.curso);
+                const matchedDocente = d.docente
+                  ? nextDocentes.find((doc) => doc.matricula === d.docente || doc.id === d.docente)
+                  : undefined;
+                const ch = Number(d.cargaHoraria) || ex?.cargaHoraria || 60;
+                const aulasSem = Number(d.aulasSemanais) || ex?.aulasSemanais || Math.max(1, Math.round(ch / 20));
                 return {
                   id: ex?.id || d.codigo || String(d.id),
                   codigo: d.codigo,
                   nome: d.nome,
                   cursoId: matchedCurso?.id || ex?.cursoId || nextCursos[0]?.id || "c1",
-                  periodo: ex?.periodo || 1,
-                  cargaHoraria: Number(d.cargaHoraria) || ex?.cargaHoraria || 60,
+                  periodo: Number(d.periodo) || ex?.periodo || 1,
+                  aulasSemanais: aulasSem,
+                  cargaHoraria: ch,
+                  docenteId: matchedDocente?.id ?? ex?.docenteId,
                 };
               })
             : current.disciplinas;
 
-          const nextPeriodos: Periodo[] = Array.isArray(dbPeriodos) && dbPeriodos.length > 0
+          const rawNextPeriodos: Periodo[] = Array.isArray(dbPeriodos) && dbPeriodos.length > 0
             ? dbPeriodos.map((p: any) => {
                 const ex = current.periodos.find((x) => x.nome === p.nome || x.id === p.codigo);
                 return {
@@ -506,6 +579,21 @@ export const useStore = create<State>()(
               })
             : current.periodos;
 
+          // Garante que apenas um período letivo fique ativo por vez
+          let jaTemAtivo = false;
+          const nextPeriodos: Periodo[] = rawNextPeriodos.map((p) => {
+            if (p.ativo && !jaTemAtivo) {
+              jaTemAtivo = true;
+              return p;
+            }
+            return { ...p, ativo: false };
+          });
+          if (!jaTemAtivo && nextPeriodos.length > 0) {
+            nextPeriodos[0] = { ...nextPeriodos[0], ativo: true };
+          }
+
+          const periodoAtivoNome = nextPeriodos.find((p) => p.ativo)?.nome || "2026.1";
+
           const nextAlocacoes: Alocacao[] = Array.isArray(dbAlocacoes)
             ? dbAlocacoes.map((a: any) => {
                 const disc = nextDisciplinas.find((d) => d.codigo === a.disciplina || d.id === a.disciplina);
@@ -515,13 +603,15 @@ export const useStore = create<State>()(
                 const diaIdx = DIA_CODES.indexOf(String(a.dia_semana || "SEG").toUpperCase());
                 const hIni = String(a.horario_inicio || "08:00").slice(0, 5);
                 const hFim = String(a.horario_fim || "09:40").slice(0, 5);
+                const perLetivo = String(a.periodo_letivo || a.periodoLetivo || periodoAtivoNome);
                 return {
                   id: String(a.id),
                   disciplinaId: disc?.id || a.disciplina,
-                  docenteId: doc?.id || a.docente,
+                  docenteId: doc?.id || disc?.docenteId || a.docente,
                   ambienteId: amb?.id || a.ambiente,
                   cursoId: cur?.id || a.turma,
                   periodoCurso: Number(a.periodo) || 1,
+                  periodoLetivo: perLetivo,
                   dia: diaIdx >= 0 ? diaIdx : 0,
                   horario: `${hIni}-${hFim}`,
                 };
@@ -627,20 +717,99 @@ export const useStore = create<State>()(
       },
 
       addDisciplina: (d) => {
-        const id = uid();
-        set((s) => ({ disciplinas: [...s.disciplinas, { ...d, id }] }));
+        const existentes = get().disciplinas;
         const cursoCodigo = get().cursos.find((c) => c.id === d.cursoId)?.codigo || d.cursoId;
-        addDisciplinaApi({ codigo: d.codigo, nome: d.nome, cargaHoraria: d.cargaHoraria, curso: cursoCodigo });
-        get().addLog("disciplina.criar", d.nome);
+        const codigoInformado = (d.codigo || "").trim().toUpperCase();
+
+        if (codigoInformado && isCodigoDisciplinaDuplicado(codigoInformado, existentes)) {
+          return {
+            ok: false,
+            codigo: codigoInformado,
+            error: `Já existe uma disciplina cadastrada com o código ${codigoInformado}.`,
+          };
+        }
+
+        const codigoFinal =
+          codigoInformado || gerarCodigoDisciplina(d.nome, cursoCodigo, d.periodo, existentes);
+        const aulasSemanais = Math.max(1, Number(d.aulasSemanais) || Math.round((Number(d.cargaHoraria) || 60) / 20));
+        const cargaHoraria = Number(d.cargaHoraria) || aulasSemanais * 20;
+
+        const id = uid();
+        const nova: Disciplina = {
+          ...d,
+          id,
+          codigo: codigoFinal,
+          aulasSemanais,
+          cargaHoraria,
+        };
+
+        set((s) => ({ disciplinas: [...s.disciplinas, nova] }));
+        const docMatricula = nova.docenteId
+          ? get().docentes.find((doc) => doc.id === nova.docenteId)?.matricula || nova.docenteId
+          : undefined;
+        addDisciplinaApi({
+          codigo: codigoFinal,
+          nome: nova.nome,
+          cargaHoraria: nova.cargaHoraria,
+          aulasSemanais: nova.aulasSemanais,
+          periodo: nova.periodo,
+          docente: docMatricula,
+          curso: cursoCodigo,
+        });
+        get().addLog("disciplina.criar", `${nova.codigo} - ${nova.nome} (${nova.aulasSemanais} aulas/sem)`);
+        return { ok: true, codigo: codigoFinal };
       },
       updateDisciplina: (id, d) => {
-        set((s) => ({ disciplinas: s.disciplinas.map((x) => (x.id === id ? { ...x, ...d } : x)) }));
+        const existentes = get().disciplinas;
+        const atual = existentes.find((x) => x.id === id);
+        if (!atual) {
+          return { ok: false, error: "Disciplina não encontrada." };
+        }
+
+        const novoCodigo = d.codigo !== undefined ? d.codigo.trim().toUpperCase() : atual.codigo;
+        if (novoCodigo && isCodigoDisciplinaDuplicado(novoCodigo, existentes, id)) {
+          return {
+            ok: false,
+            error: `Já existe outra disciplina cadastrada com o código ${novoCodigo}.`,
+          };
+        }
+
+        const cursoIdFinal = d.cursoId ?? atual.cursoId;
+        const cursoCodigo = get().cursos.find((c) => c.id === cursoIdFinal)?.codigo || cursoIdFinal;
+        const periodoFinal = d.periodo ?? atual.periodo;
+        const nomeFinal = d.nome ?? atual.nome;
+        const codigoFinal =
+          novoCodigo || gerarCodigoDisciplina(nomeFinal, cursoCodigo, periodoFinal, existentes, id);
+
+        set((s) => ({
+          disciplinas: s.disciplinas.map((x) =>
+            x.id === id ? { ...x, ...d, codigo: codigoFinal } : x,
+          ),
+          // Se o professor vinculado à disciplina foi definido/alterado, sincroniza as alocações dessa disciplina
+          alocacoes:
+            d.docenteId
+              ? s.alocacoes.map((aloc) =>
+                  aloc.disciplinaId === id ? { ...aloc, docenteId: d.docenteId! } : aloc,
+                )
+              : s.alocacoes,
+        }));
         const target = get().disciplinas.find((x) => x.id === id);
         if (target) {
-          const cursoCodigo = get().cursos.find((c) => c.id === target.cursoId)?.codigo || target.cursoId;
-          addDisciplinaApi({ codigo: target.codigo, nome: target.nome, cargaHoraria: target.cargaHoraria, curso: cursoCodigo });
+          const docMatricula = target.docenteId
+            ? get().docentes.find((doc) => doc.id === target.docenteId)?.matricula || target.docenteId
+            : undefined;
+          updateDisciplinaApi(target.codigo, {
+            codigo: target.codigo,
+            nome: target.nome,
+            cargaHoraria: target.cargaHoraria,
+            aulasSemanais: target.aulasSemanais,
+            periodo: target.periodo,
+            docente: docMatricula,
+            curso: cursoCodigo,
+          });
         }
-        get().addLog("disciplina.editar", id);
+        get().addLog("disciplina.editar", `${codigoFinal} (${id})`);
+        return { ok: true };
       },
       removeDisciplina: (id) => {
         const target = get().disciplinas.find((x) => x.id === id);
@@ -651,15 +820,86 @@ export const useStore = create<State>()(
 
       addPeriodo: (p) => {
         const id = uid();
-        set((s) => ({ periodos: [...s.periodos, { ...p, id }] }));
-        addPeriodoApi({ codigo: p.nome, nome: p.nome, inicio: p.inicio, fim: p.fim, inicioMatricula: p.inicioMatricula, fimMatricula: p.fimMatricula, ativo: p.ativo });
-        get().addLog("periodo.criar", p.nome);
+        const deveAtivar = Boolean(p.ativo) || get().periodos.length === 0;
+        set((s) => {
+          const anteriores = deveAtivar
+            ? s.periodos.map((x) => ({ ...x, ativo: false }))
+            : s.periodos;
+          return { periodos: [...anteriores, { ...p, ativo: deveAtivar, id }] };
+        });
+        if (deveAtivar) {
+          get()
+            .periodos.filter((x) => x.id !== id)
+            .forEach((other) => {
+              addPeriodoApi({
+                codigo: other.nome,
+                nome: other.nome,
+                inicio: other.inicio,
+                fim: other.fim,
+                inicioMatricula: other.inicioMatricula,
+                fimMatricula: other.fimMatricula,
+                ativo: false,
+              });
+            });
+        }
+        addPeriodoApi({
+          codigo: p.nome,
+          nome: p.nome,
+          inicio: p.inicio,
+          fim: p.fim,
+          inicioMatricula: p.inicioMatricula,
+          fimMatricula: p.fimMatricula,
+          ativo: deveAtivar,
+        });
+        get().addLog("periodo.criar", `${p.nome} (${deveAtivar ? "Ativo" : "Arquivado"})`);
       },
       updatePeriodo: (id, p) => {
-        set((s) => ({ periodos: s.periodos.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
-        const target = get().periodos.find((x) => x.id === id);
-        if (target) addPeriodoApi({ codigo: target.nome, nome: target.nome, inicio: target.inicio, fim: target.fim, inicioMatricula: target.inicioMatricula, fimMatricula: target.fimMatricula, ativo: target.ativo });
+        set((s) => {
+          const ativandoEste = p.ativo === true;
+          let lista = s.periodos.map((x) => {
+            if (x.id === id) return { ...x, ...p };
+            if (ativandoEste) return { ...x, ativo: false };
+            return x;
+          });
+          // Se desmarcou o único período ativo e existem outros, mantém pelo menos 1 ativo para consistência
+          if (!lista.some((x) => x.ativo) && lista.length > 0) {
+            const fallback = lista.find((x) => x.id !== id) ?? lista[0];
+            lista = lista.map((x) => (x.id === fallback.id ? { ...x, ativo: true } : x));
+          }
+          return { periodos: lista };
+        });
+        get().periodos.forEach((item) => {
+          addPeriodoApi({
+            codigo: item.nome,
+            nome: item.nome,
+            inicio: item.inicio,
+            fim: item.fim,
+            inicioMatricula: item.inicioMatricula,
+            fimMatricula: item.fimMatricula,
+            ativo: item.ativo,
+          });
+        });
         get().addLog("periodo.editar", id);
+      },
+      ativarPeriodo: (id) => {
+        set((s) => ({
+          periodos: s.periodos.map((x) => ({ ...x, ativo: x.id === id })),
+        }));
+        get().periodos.forEach((item) => {
+          addPeriodoApi({
+            codigo: item.nome,
+            nome: item.nome,
+            inicio: item.inicio,
+            fim: item.fim,
+            inicioMatricula: item.inicioMatricula,
+            fimMatricula: item.fimMatricula,
+            ativo: item.ativo,
+          });
+        });
+        const target = get().periodos.find((x) => x.id === id);
+        if (target) {
+          get().addLog("periodo.ativar", `Período letivo ativo alterado para ${target.nome}`);
+        }
       },
       removePeriodo: (id) => {
         const target = get().periodos.find((x) => x.id === id);
@@ -785,25 +1025,31 @@ export const useStore = create<State>()(
 
       setAlocacao: (a) => {
         const id = a.id ?? uid();
+        const periodoAtivo = get().periodos.find((p) => p.ativo)?.nome || "2026.1";
+        const periodoLetivo = a.periodoLetivo || periodoAtivo;
+        const discObj = get().disciplinas.find((d) => d.id === a.disciplinaId);
+        const docenteIdFinal = a.docenteId || discObj?.docenteId || "";
+
         const conflict = get().alocacoes.find(
           (x) =>
             x.id !== id &&
+            (x.periodoLetivo || "2026.1") === periodoLetivo &&
             x.dia === a.dia &&
             x.horario === a.horario &&
-            (x.docenteId === a.docenteId ||
+            (x.docenteId === docenteIdFinal ||
               x.ambienteId === a.ambienteId ||
               (x.cursoId === a.cursoId && x.periodoCurso === a.periodoCurso)),
         );
         set((s) => {
           const exists = s.alocacoes.some((x) => x.id === id);
-          const next = { ...a, id } as Alocacao;
+          const next: Alocacao = { ...a, docenteId: docenteIdFinal, periodoLetivo, id };
           return {
             alocacoes: exists ? s.alocacoes.map((x) => (x.id === id ? next : x)) : [...s.alocacoes, next],
           };
         });
 
-        const disc = get().disciplinas.find((d) => d.id === a.disciplinaId)?.codigo || a.disciplinaId;
-        const doc = get().docentes.find((d) => d.id === a.docenteId)?.matricula || a.docenteId;
+        const disc = discObj?.codigo || a.disciplinaId;
+        const doc = get().docentes.find((d) => d.id === docenteIdFinal)?.matricula || docenteIdFinal;
         const amb = get().ambientes.find((am) => am.id === a.ambienteId)?.codigo || a.ambienteId;
         const curso = get().cursos.find((c) => c.id === a.cursoId)?.codigo || a.cursoId;
         const { inicio, fim } = toBackendHorario(a.horario);
@@ -814,12 +1060,13 @@ export const useStore = create<State>()(
           ambiente: amb,
           turma: curso,
           periodo: a.periodoCurso,
+          periodoLetivo,
           diaSemana: DIA_CODES[a.dia] || "SEG",
           horarioInicio: inicio,
           horarioFim: fim,
         });
 
-        get().addLog("alocacao.salvar", `${a.dia}/${a.horario}`);
+        get().addLog("alocacao.salvar", `${periodoLetivo} · ${a.dia}/${a.horario}`);
         return conflict ? conflict.id : null;
       },
       removeAlocacao: (id) => {
@@ -837,6 +1084,7 @@ export const useStore = create<State>()(
             ambiente: amb,
             turma: curso,
             periodo: target.periodoCurso,
+            periodoLetivo: target.periodoLetivo,
             diaSemana: DIA_CODES[target.dia] || "SEG",
             horarioInicio: inicio,
             horarioFim: fim,
@@ -848,12 +1096,61 @@ export const useStore = create<State>()(
     }),
     {
       name: "hifcg-store-v7",
-      version: 7,
+      version: 9,
       migrate: (persisted) => {
         const s = persisted as Partial<State> | undefined;
         const cursos = (s?.cursos ?? seedCursos).map((c) => ({ ...c, periodos: c.periodos ?? 6 }));
-        const alocacoes = (s?.alocacoes ?? []).map((a) => ({ ...a, periodoCurso: (a as any).periodoCurso ?? 1 }));
-        return { ...(s ?? {}), cursos, alocacoes, users: seedUsers, currentUserId: null } as State;
+
+        // Garante que apenas um período fique ativo por vez
+        const rawPeriodos = s?.periodos ?? seedPeriodos;
+        let hasActive = false;
+        const periodos = rawPeriodos.map((p) => {
+          if (p.ativo && !hasActive) {
+            hasActive = true;
+            return p;
+          }
+          return { ...p, ativo: false };
+        });
+        if (!hasActive && periodos.length > 0) {
+          periodos[0] = { ...periodos[0], ativo: true };
+        }
+        const defaultPeriodoLetivo = periodos.find((p) => p.ativo)?.nome || "2026.1";
+
+        const rawDisciplinas = s?.disciplinas ?? seedDisciplinas;
+        const disciplinasMigradas: Disciplina[] = [];
+        for (const d of rawDisciplinas) {
+          const ch = Number(d.cargaHoraria) || 60;
+          const aulasSemanais = Number((d as any).aulasSemanais) || Math.max(1, Math.round(ch / 20));
+          const cursoCodigo = cursos.find((c) => c.id === d.cursoId)?.codigo || "DIS";
+          const codigoUnico =
+            !d.codigo || isCodigoDisciplinaDuplicado(d.codigo, disciplinasMigradas, d.id)
+              ? gerarCodigoDisciplina(d.nome, cursoCodigo, d.periodo || 1, disciplinasMigradas, d.id)
+              : d.codigo.trim().toUpperCase();
+          const seedMatch = seedDisciplinas.find((sd) => sd.id === d.id || sd.codigo === codigoUnico);
+          disciplinasMigradas.push({
+            ...d,
+            codigo: codigoUnico,
+            aulasSemanais,
+            cargaHoraria: ch,
+            docenteId: (d as any).docenteId ?? seedMatch?.docenteId,
+          });
+        }
+
+        const alocacoes = (s?.alocacoes ?? []).map((a) => ({
+          ...a,
+          periodoCurso: (a as any).periodoCurso ?? 1,
+          periodoLetivo: (a as any).periodoLetivo || defaultPeriodoLetivo,
+        }));
+
+        return {
+          ...(s ?? {}),
+          cursos,
+          periodos,
+          disciplinas: disciplinasMigradas,
+          alocacoes,
+          users: seedUsers,
+          currentUserId: null,
+        } as State;
       },
     },
   ),
@@ -863,6 +1160,11 @@ export const useCurrentUser = () => {
   const id = useStore((s) => s.currentUserId);
   const users = useStore((s) => s.users);
   return users.find((u) => u.id === id) ?? null;
+};
+
+export const useActivePeriodo = () => {
+  const periodos = useStore((s) => s.periodos);
+  return periodos.find((p) => p.ativo) ?? periodos[0] ?? null;
 };
 
 export interface HorarioSlot {

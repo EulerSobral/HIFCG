@@ -56,9 +56,16 @@ CREATE TABLE IF NOT EXISTS disciplina (
     ementa TEXT,
     especialidade VARCHAR(100),
     carga_horaria INT NOT NULL,
+    aulas_semanais INT DEFAULT 4 NOT NULL,
+    periodo INT DEFAULT 1 NOT NULL,
+    docente_id VARCHAR(50),
     curso_id VARCHAR(50) NOT NULL,
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
+
+ALTER TABLE disciplina ADD COLUMN IF NOT EXISTS aulas_semanais INT DEFAULT 4 NOT NULL;
+ALTER TABLE disciplina ADD COLUMN IF NOT EXISTS periodo INT DEFAULT 1 NOT NULL;
+ALTER TABLE disciplina ADD COLUMN IF NOT EXISTS docente_id VARCHAR(50);
 
 -- 6. Tabela de Períodos Letivos
 CREATE TABLE IF NOT EXISTS periodo (
@@ -80,10 +87,13 @@ CREATE TABLE IF NOT EXISTS alocacao_horario (
     ambiente VARCHAR(100) NOT NULL,
     turma VARCHAR(100) NOT NULL,
     periodo INT NOT NULL,
+    periodo_letivo VARCHAR(50) DEFAULT '2026.1' NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL
 );
+
+ALTER TABLE alocacao_horario ADD COLUMN IF NOT EXISTS periodo_letivo VARCHAR(50) DEFAULT '2026.1' NOT NULL;
 
 -- 8. Tabela de Log de Alterações e Auditoria (RF34)
 CREATE TABLE IF NOT EXISTS log_sistema (
@@ -166,20 +176,20 @@ VALUES ('AUD-01', 'Auditório 01', 'Auditório principal', 120, 'AUDITORIO')
 ON CONFLICT (codigo) DO NOTHING;
 
 -- Disciplinas Padrão
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('MAT101', 'Matemática Discreta', 80, 'TADS')
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('MAT101', 'Matemática Discreta', 80, 4, 1, 'TADS')
 ON CONFLICT (codigo) DO NOTHING;
 
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('PRG101', 'Programação I', 80, 'TADS')
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('PRG101', 'Programação I', 80, 4, 1, 'TADS')
 ON CONFLICT (codigo) DO NOTHING;
 
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('BD101', 'Banco de Dados', 60, 'TADS')
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('BD101', 'Banco de Dados', 60, 3, 2, 'TADS')
 ON CONFLICT (codigo) DO NOTHING;
 
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('RED101', 'Redes de Computadores', 60, 'INFO-INT')
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('RED101', 'Redes de Computadores', 60, 3, 1, 'INFO-INT')
 ON CONFLICT (codigo) DO NOTHING;
 
 -- Log de Inicialização

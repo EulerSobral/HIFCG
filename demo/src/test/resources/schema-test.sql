@@ -57,6 +57,9 @@ CREATE TABLE disciplina (
     ementa TEXT,
     especialidade VARCHAR(100),
     carga_horaria INT NOT NULL,
+    aulas_semanais INT DEFAULT 4 NOT NULL,
+    periodo INT DEFAULT 1 NOT NULL,
+    docente_id VARCHAR(50),
     curso_id VARCHAR(50) NOT NULL,
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
@@ -79,6 +82,7 @@ CREATE TABLE alocacao_horario (
     ambiente VARCHAR(100) NOT NULL,
     turma VARCHAR(100) NOT NULL,
     periodo INT NOT NULL,
+    periodo_letivo VARCHAR(50) DEFAULT '2026.1' NOT NULL,
     dia_semana VARCHAR(20) NOT NULL,
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL
@@ -122,11 +126,11 @@ VALUES ('S-101', 'Sala 101', 'Sala de aula padrão', 40, 'SALA');
 INSERT INTO ambiente (codigo, nome, descricao, capacidade, tipo)
 VALUES ('LAB-01', 'Laboratório 01', 'Laboratório de Informática', 30, 'LABORATORIO');
 
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('MAT101', 'Matemática Discreta', 80, 'TADS');
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('MAT101', 'Matemática Discreta', 80, 4, 1, 'TADS');
 
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
-VALUES ('PRG101', 'Programação I', 80, 'TADS');
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
+VALUES ('PRG101', 'Programação I', 80, 4, 1, 'TADS');
 
 INSERT INTO log_sistema (usuario_matricula, acao, detalhes)
 VALUES ('DIR001', 'sistema.inicio', 'Sistema HIFCG inicializado com dados padrão');

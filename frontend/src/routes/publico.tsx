@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/Combobox";
 import { ResourceDetailsModal } from "@/components/ResourceDetailsModal";
-import { DIAS, SLOTS_HORARIOS, getTurnosParaCurso, useStore, type Alocacao } from "@/lib/store";
+import { DIAS, SLOTS_HORARIOS, getTurnosParaCurso, useStore, useActivePeriodo, type Alocacao } from "@/lib/store";
 import { CalendarClock, ArrowLeft, BookOpen, User, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/publico")({
@@ -18,6 +18,8 @@ type TipoVisualizacao = "curso" | "docente" | "ambiente";
 
 function Page() {
   const s = useStore();
+  const activePeriodoObj = useActivePeriodo();
+  const periodoLetivoAtivo = activePeriodoObj?.nome || "2026.1";
   const [tipoView, setTipoView] = useState<TipoVisualizacao>("curso");
 
   // Filtros para visualização por Curso
@@ -50,24 +52,25 @@ function Page() {
   const [detailsDocenteId, setDetailsDocenteId] = useState<string | null>(null);
   const [detailsAmbienteId, setDetailsAmbienteId] = useState<string | null>(null);
 
-  // Mapa de alocações conforme o tipo de visualização ativo
+  // Mapa de alocações conforme o tipo de visualização ativo e período letivo ativo
   const mapAlocacoes = useMemo(() => {
     const m: Record<string, Alocacao[]> = {};
     let list: Alocacao[] = [];
+    const alocacoesDoPeriodoLetivo = s.alocacoes.filter((a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo);
 
     if (tipoView === "curso") {
-      list = s.alocacoes.filter((a) => a.cursoId === activeCursoId && a.periodoCurso === periodoCurso);
+      list = alocacoesDoPeriodoLetivo.filter((a) => a.cursoId === activeCursoId && a.periodoCurso === periodoCurso);
     } else if (tipoView === "docente") {
-      list = s.alocacoes.filter((a) => a.docenteId === selectedDocenteId);
+      list = alocacoesDoPeriodoLetivo.filter((a) => a.docenteId === selectedDocenteId);
     } else if (tipoView === "ambiente") {
-      list = s.alocacoes.filter((a) => a.ambienteId === selectedAmbienteId);
+      list = alocacoesDoPeriodoLetivo.filter((a) => a.ambienteId === selectedAmbienteId);
     }
 
     list.forEach((a) => {
       (m[`${a.dia}-${a.horario}`] ||= []).push(a);
     });
     return m;
-  }, [s.alocacoes, tipoView, activeCursoId, periodoCurso, selectedDocenteId, selectedAmbienteId]);
+  }, [s.alocacoes, periodoLetivoAtivo, tipoView, activeCursoId, periodoCurso, selectedDocenteId, selectedAmbienteId]);
 
   // Turnos a serem exibidos (Se for por curso, filtra por modalidade Ex: Integral omite Noturno; Noturno omite Manhã e Tarde)
   const turnosVisiveis = useMemo(() => {
@@ -193,9 +196,9 @@ function Page() {
         {/* Tabela da Grade de Aulas */}
         <Card className="p-3 overflow-x-auto">
           <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">
-            {tipoView === "curso" && (selectedCurso ? `Grade de Aulas: ${selectedCurso.nome} (${selectedCurso.codigo}) · Turno ${selectedCurso.turno} · ${periodoCurso}º Período` : "Nenhum curso selecionado")}
-            {tipoView === "docente" && (selectedDocente ? `Horários do Docente: ${selectedDocente.nome} (${selectedDocente.area})` : "Nenhum docente selecionado")}
-            {tipoView === "ambiente" && (selectedAmbiente ? `Horários do Ambiente: ${selectedAmbiente.codigo} (${selectedAmbiente.tipo} - Bloco ${selectedAmbiente.bloco})` : "Nenhum ambiente selecionado")}
+            {tipoView === "curso" && (selectedCurso ? `Grade de Aulas (${periodoLetivoAtivo}): ${selectedCurso.nome} (${selectedCurso.codigo}) · Turno ${selectedCurso.turno} · ${periodoCurso}º Período` : "Nenhum curso selecionado")}
+            {tipoView === "docente" && (selectedDocente ? `Horários do Docente (${periodoLetivoAtivo}): ${selectedDocente.nome} (${selectedDocente.area})` : "Nenhum docente selecionado")}
+            {tipoView === "ambiente" && (selectedAmbiente ? `Horários do Ambiente (${periodoLetivoAtivo}): ${selectedAmbiente.codigo} (${selectedAmbiente.tipo} - Bloco ${selectedAmbiente.bloco})` : "Nenhum ambiente selecionado")}
           </div>
 
           <table className="w-full text-xs border-collapse">

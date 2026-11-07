@@ -360,18 +360,62 @@ public class ApiController {
     @PostMapping("/disciplinas")
     public ResponseEntity<?> addDisciplina(@RequestBody Map<String, Object> body) {
         try {
-            String codigo = body.get("codigo") != null ? body.get("codigo").toString() : "DISC" + (System.currentTimeMillis() % 10000);
             String nome = body.get("nome") != null ? body.get("nome").toString() : "Nova Disciplina";
-            int cargaHoraria = body.get("cargaHoraria") != null ? Integer.parseInt(body.get("cargaHoraria").toString()) : 60;
             String curso = body.get("curso") != null ? body.get("curso").toString() : (body.get("cursoId") != null ? body.get("cursoId").toString() : "TADS");
+            int periodo = body.get("periodo") != null ? Integer.parseInt(body.get("periodo").toString()) : 1;
+            int aulasSemanais = body.get("aulasSemanais") != null ? Integer.parseInt(body.get("aulasSemanais").toString()) : 4;
+            int cargaHoraria = body.get("cargaHoraria") != null ? Integer.parseInt(body.get("cargaHoraria").toString()) : (aulasSemanais * 20);
+            String docente = body.get("docente") != null ? body.get("docente").toString() : (body.get("docenteId") != null ? body.get("docenteId").toString() : null);
+
+            String codigoInformado = body.get("codigo") != null ? body.get("codigo").toString().trim().toUpperCase() : "";
+            boolean isUpdate = Boolean.parseBoolean(String.valueOf(body.getOrDefault("isUpdate", "false")));
+            if (!codigoInformado.isEmpty() && !isUpdate && disciplinaRepository.existsByCodigo(codigoInformado)) {
+                return ResponseEntity.badRequest().body("Já existe uma disciplina cadastrada com o código: " + codigoInformado);
+            }
+
+            String codigo = codigoInformado.isEmpty()
+                    ? disciplinaRepository.gerarCodigoUnico(nome, curso, periodo)
+                    : codigoInformado;
 
             Disciplina d = Disciplina.builder()
                     .codigo(codigo)
                     .nome(nome)
                     .cargaHoraria(cargaHoraria)
+                    .aulasSemanais(aulasSemanais)
+                    .periodo(periodo)
+                    .docente(docente)
                     .curso(curso)
                     .build();
 
+            disciplinaRepository.save(d);
+            return ResponseEntity.ok(d);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
+    @PutMapping("/disciplinas/{codigo}")
+    public ResponseEntity<?> updateDisciplina(@PathVariable String codigo, @RequestBody Map<String, Object> body) {
+        try {
+            Optional<Disciplina> opt = disciplinaRepository.findByCodigo(codigo);
+            String nome = body.get("nome") != null ? body.get("nome").toString() : opt.map(Disciplina::getNome).orElse("Disciplina");
+            String curso = body.get("curso") != null ? body.get("curso").toString() : (body.get("cursoId") != null ? body.get("cursoId").toString() : opt.map(Disciplina::getCurso).orElse("TADS"));
+            int periodo = body.get("periodo") != null ? Integer.parseInt(body.get("periodo").toString()) : opt.map(Disciplina::getPeriodo).orElse(1);
+            int aulasSemanais = body.get("aulasSemanais") != null ? Integer.parseInt(body.get("aulasSemanais").toString()) : opt.map(Disciplina::getAulasSemanais).orElse(4);
+            int cargaHoraria = body.get("cargaHoraria") != null ? Integer.parseInt(body.get("cargaHoraria").toString()) : opt.map(Disciplina::getCargaHoraria).orElse(aulasSemanais * 20);
+            String docente = body.containsKey("docente")
+                    ? (body.get("docente") != null ? body.get("docente").toString() : null)
+                    : (body.containsKey("docenteId") ? (body.get("docenteId") != null ? body.get("docenteId").toString() : null) : opt.map(Disciplina::getDocente).orElse(null));
+
+            Disciplina d = Disciplina.builder()
+                    .codigo(codigo.trim().toUpperCase())
+                    .nome(nome)
+                    .cargaHoraria(cargaHoraria)
+                    .aulasSemanais(aulasSemanais)
+                    .periodo(periodo)
+                    .docente(docente)
+                    .curso(curso)
+                    .build();
             disciplinaRepository.save(d);
             return ResponseEntity.ok(d);
         } catch (Exception ex) {
@@ -430,11 +474,12 @@ public class ApiController {
             String turma = body.getOrDefault("turma", "T1");
             String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");
             Integer per = (perStr != null && !perStr.isEmpty()) ? Integer.parseInt(perStr.replaceAll("\\D+", "")) : 1;
+            String periodoLetivo = body.getOrDefault("periodoLetivo", "2026.1");
             String dia = body.getOrDefault("diaSemana", "SEG");
             Time hIni = Time.valueOf(body.getOrDefault("horarioInicio", "08:00:00"));
             Time hFim = Time.valueOf(body.getOrDefault("horarioFim", "09:40:00"));
 
-            alocacaoHorarioRepository.alocarHorario(disc, doc, amb, turma, per, dia, hIni, hFim);
+            alocacaoHorarioRepository.alocarHorario(disc, doc, amb, turma, per, periodoLetivo, dia, hIni, hFim);
             return ResponseEntity.ok("Alocação realizada com sucesso");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
@@ -460,11 +505,12 @@ public class ApiController {
             String turma = body.getOrDefault("turma", "T1");
             String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");
             Integer per = (perStr != null && !perStr.isEmpty()) ? Integer.parseInt(perStr.replaceAll("\\D+", "")) : 1;
+            String periodoLetivo = body.get("periodoLetivo");
             String dia = body.getOrDefault("diaSemana", "SEG");
             Time hIni = Time.valueOf(body.getOrDefault("horarioInicio", "08:00:00"));
             Time hFim = Time.valueOf(body.getOrDefault("horarioFim", "09:40:00"));
 
-            alocacaoHorarioRepository.removerAlocacoes(disc, doc, amb, turma, per, dia, hIni, hFim);
+            alocacaoHorarioRepository.removerAlocacoes(disc, doc, amb, turma, per, periodoLetivo, dia, hIni, hFim);
             return ResponseEntity.ok("Alocação removida com sucesso");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());

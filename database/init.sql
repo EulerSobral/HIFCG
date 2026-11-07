@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS disciplina (
     ementa TEXT,
     especialidade VARCHAR(100),
     carga_horaria INT NOT NULL,
+    aulas_semanais INT DEFAULT 4 NOT NULL,
+    periodo INT DEFAULT 1 NOT NULL,
+    docente_id VARCHAR(50),
     curso_id VARCHAR(50) NOT NULL,
     CONSTRAINT fk_disciplina_curso FOREIGN KEY (curso_id) REFERENCES curso(codigo) ON DELETE CASCADE
 );
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS alocacao_horario (
     ambiente VARCHAR(100) NOT NULL,
     turma VARCHAR(100) NOT NULL,
     periodo INT NOT NULL,
+    periodo_letivo VARCHAR(50) DEFAULT '2026.1' NOT NULL,
     dia_semana VARCHAR(20) NOT NULL, -- 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'
     horario_inicio TIME NOT NULL,
     horario_fim TIME NOT NULL
@@ -137,12 +141,12 @@ VALUES
 ON CONFLICT (codigo) DO NOTHING;
 
 -- Disciplinas
-INSERT INTO disciplina (codigo, nome, carga_horaria, curso_id)
+INSERT INTO disciplina (codigo, nome, carga_horaria, aulas_semanais, periodo, curso_id)
 VALUES
-    ('MAT101', 'Matemática Discreta', 80, 'TADS'),
-    ('PRG101', 'Programação I', 80, 'TADS'),
-    ('BD101', 'Banco de Dados', 60, 'TADS'),
-    ('RED101', 'Redes de Computadores', 60, 'INFO-INT')
+    ('MAT101', 'Matemática Discreta', 80, 4, 1, 'TADS'),
+    ('PRG101', 'Programação I', 80, 4, 1, 'TADS'),
+    ('BD101', 'Banco de Dados', 60, 3, 2, 'TADS'),
+    ('RED101', 'Redes de Computadores', 60, 3, 1, 'INFO-INT')
 ON CONFLICT (codigo) DO NOTHING;
 
 -- Log de Inicialização (insere apenas se a tabela estiver vazia)

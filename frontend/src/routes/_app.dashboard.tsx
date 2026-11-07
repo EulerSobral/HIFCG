@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStore, useCurrentUser, roleLabel } from "@/lib/store";
+import { useStore, useCurrentUser, useActivePeriodo, roleLabel } from "@/lib/store";
 import { Users, Building2, GraduationCap, BookOpen, CalendarRange, GanttChartSquare, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -12,11 +12,14 @@ export const Route = createFileRoute("/_app/dashboard")({
 function Dashboard() {
   const user = useCurrentUser();
   const s = useStore();
+  const activePeriodoObj = useActivePeriodo();
+  const periodoLetivoAtivo = activePeriodoObj?.nome || "2026.1";
+  const alocacoesAtivas = s.alocacoes.filter((a) => (a.periodoLetivo || "2026.1") === periodoLetivoAtivo);
 
   const conflicts: string[] = [];
-  for (let i = 0; i < s.alocacoes.length; i++) {
-    for (let j = i + 1; j < s.alocacoes.length; j++) {
-      const a = s.alocacoes[i], b = s.alocacoes[j];
+  for (let i = 0; i < alocacoesAtivas.length; i++) {
+    for (let j = i + 1; j < alocacoesAtivas.length; j++) {
+      const a = alocacoesAtivas[i], b = alocacoesAtivas[j];
       if (
         a.dia === b.dia &&
         a.horario === b.horario &&
@@ -35,7 +38,7 @@ function Dashboard() {
     { label: "Cursos", value: s.cursos.length, icon: GraduationCap, to: "/cursos" as const },
     { label: "Disciplinas", value: s.disciplinas.length, icon: BookOpen, to: "/disciplinas" as const },
     { label: "Períodos", value: s.periodos.length, icon: CalendarRange, to: "/periodos" as const },
-    { label: "Alocações", value: s.alocacoes.length, icon: GanttChartSquare, to: "/horarios" as const },
+    { label: `Alocações (${periodoLetivoAtivo})`, value: alocacoesAtivas.length, icon: GanttChartSquare, to: "/horarios" as const },
   ];
 
   return (

@@ -36,23 +36,37 @@ public class AlocacaoHorarioRepository {
     }
 
     public void alocarHorario(String disciplina, String docente, String ambiente, String turma, Integer periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
-        if (existeChoqueAmbiente(ambiente, diaSemana, horarioInicio, horarioFim)) {
+        alocarHorario(disciplina, docente, ambiente, turma, periodo, "2026.1", diaSemana, horarioInicio, horarioFim);
+    }
+
+    public void alocarHorario(String disciplina, String docente, String ambiente, String turma, Integer periodo, String periodoLetivo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        String perLetivo = (periodoLetivo != null && !periodoLetivo.isBlank()) ? periodoLetivo.trim() : "2026.1";
+        if (existeChoqueAmbiente(ambiente, perLetivo, diaSemana, horarioInicio, horarioFim)) {
             throw new RuntimeException("Choque de horário detectado para o Ambiente: " + ambiente);
         }
-        if (existeChoqueDocente(docente, diaSemana, horarioInicio, horarioFim)) {
+        if (existeChoqueDocente(docente, perLetivo, diaSemana, horarioInicio, horarioFim)) {
             throw new RuntimeException("Choque de horário detectado para o Docente: " + docente);
         }
-        if (existeChoqueTurma(turma, periodo, diaSemana, horarioInicio, horarioFim)) {
+        if (existeChoqueTurma(turma, periodo, perLetivo, diaSemana, horarioInicio, horarioFim)) {
             throw new RuntimeException("Choque de horário detectado para a Turma/Período do Curso: " + turma + " (" + periodo + "º período)");
         }
 
-        String sql = "INSERT INTO alocacao_horario (disciplina, docente, ambiente, turma, periodo, dia_semana, horario_inicio, horario_fim) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql, disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
+        String sql = "INSERT INTO alocacao_horario (disciplina, docente, ambiente, turma, periodo, periodo_letivo, dia_semana, horario_inicio, horario_fim) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, disciplina, docente, ambiente, turma, periodo, perLetivo, diaSemana, horarioInicio, horarioFim);
     }
 
     public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, Integer periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
         String sql = "DELETE FROM alocacao_horario WHERE disciplina = ? AND docente = ? AND ambiente = ? AND turma = ? AND periodo = ? AND dia_semana = ? AND horario_inicio = ? AND horario_fim = ?";
         jdbcTemplate.update(sql, disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
+    }
+
+    public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, Integer periodo, String periodoLetivo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        if (periodoLetivo != null && !periodoLetivo.isBlank()) {
+            String sql = "DELETE FROM alocacao_horario WHERE disciplina = ? AND docente = ? AND ambiente = ? AND turma = ? AND periodo = ? AND periodo_letivo = ? AND dia_semana = ? AND horario_inicio = ? AND horario_fim = ?";
+            jdbcTemplate.update(sql, disciplina, docente, ambiente, turma, periodo, periodoLetivo.trim(), diaSemana, horarioInicio, horarioFim);
+        } else {
+            removerAlocacoes(disciplina, docente, ambiente, turma, periodo, diaSemana, horarioInicio, horarioFim);
+        }
     }
 
     public void removerAlocacoes(String disciplina, String docente, String ambiente, String turma, String periodoStr, String diaSemana, Time horarioInicio, Time horarioFim) {
@@ -71,20 +85,32 @@ public class AlocacaoHorarioRepository {
     }
 
     public boolean existeChoqueAmbiente(String codigoAmbiente, String diaSemana, Time horarioInicio, Time horarioFim) {
-        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE ambiente = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, codigoAmbiente, diaSemana, horarioFim, horarioInicio);
+        return existeChoqueAmbiente(codigoAmbiente, "2026.1", diaSemana, horarioInicio, horarioFim);
+    }
+
+    public boolean existeChoqueAmbiente(String codigoAmbiente, String periodoLetivo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE ambiente = ? AND periodo_letivo = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, codigoAmbiente, periodoLetivo, diaSemana, horarioFim, horarioInicio);
         return count != null && count > 0;
     }
 
     public boolean existeChoqueDocente(String matriculaDocente, String diaSemana, Time horarioInicio, Time horarioFim) {
-        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE docente = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, matriculaDocente, diaSemana, horarioFim, horarioInicio);
+        return existeChoqueDocente(matriculaDocente, "2026.1", diaSemana, horarioInicio, horarioFim);
+    }
+
+    public boolean existeChoqueDocente(String matriculaDocente, String periodoLetivo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE docente = ? AND periodo_letivo = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, matriculaDocente, periodoLetivo, diaSemana, horarioFim, horarioInicio);
         return count != null && count > 0;
     }
 
     public boolean existeChoqueTurma(String turma, Integer periodo, String diaSemana, Time horarioInicio, Time horarioFim) {
-        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE turma = ? AND periodo = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, turma, periodo, diaSemana, horarioFim, horarioInicio);
+        return existeChoqueTurma(turma, periodo, "2026.1", diaSemana, horarioInicio, horarioFim);
+    }
+
+    public boolean existeChoqueTurma(String turma, Integer periodo, String periodoLetivo, String diaSemana, Time horarioInicio, Time horarioFim) {
+        String sql = "SELECT COUNT(*) FROM alocacao_horario WHERE turma = ? AND periodo = ? AND periodo_letivo = ? AND dia_semana = ? AND (horario_inicio < ? AND horario_fim > ?)";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, turma, periodo, periodoLetivo, diaSemana, horarioFim, horarioInicio);
         return count != null && count > 0;
     }
 

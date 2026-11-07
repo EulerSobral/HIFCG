@@ -32,6 +32,14 @@ public class Disciplina {
     @Column(name = "carga_horaria", nullable = false)
     private Integer cargaHoraria;
 
+    @Column(name = "aulas_semanais", nullable = false)
+    private Integer aulasSemanais;
+
+    @Column(name = "periodo", nullable = false)
+    private Integer periodo;
+
+    @Column(name = "docente_id", length = 50)
+    private String docente;
 
     @JoinColumn(name = "curso_id", nullable = false)
     private String curso;
