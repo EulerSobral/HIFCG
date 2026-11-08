@@ -164,7 +164,7 @@ function Page() {
         .sort((a, b) => a.dia - b.dia || a.horario.localeCompare(b.horario));
 
       const docVinculadoId = d.docenteId || alocacoesDaDisc[0]?.docenteId || "";
-      const docVinculado = docentes.find((doc) => doc.id === docVinculadoId);
+      const docenteVinculado = docentes.find((doc) => doc.id === docVinculadoId);
 
       const blocos: BlocoAulaItem[] = Array.from({ length: totalAulas }, (_, idx) => {
         const aloc = alocacoesDaDisc[idx];

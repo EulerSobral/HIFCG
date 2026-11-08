@@ -42,7 +42,7 @@ function Page() {
       <PageHeader
         title="Visualizar horários"
         description="Por curso, docente, ambiente ou período do curso. Clique no docente ou ambiente para ver a agenda detalhada."
-        actions={
+        action={
           <Badge variant="default" className="text-xs px-3 py-1 gap-1.5">
             <CalendarRange className="h-3.5 w-3.5" />
             Período Letivo Ativo: {periodoLetivoAtivo}
