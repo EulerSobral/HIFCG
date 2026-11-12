@@ -470,6 +470,9 @@ public class ApiController {
         try {
             String disc = body.get("disciplina");
             String doc = body.get("docente");
+            if ((doc == null || doc.isBlank()) && disc != null && !disc.isBlank()) {
+                doc = disciplinaRepository.findByCodigo(disc.trim()).map(Disciplina::getDocente).orElse(doc);
+            }
             String amb = body.get("ambiente");
             String turma = body.getOrDefault("turma", "T1");
             String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");
@@ -501,6 +504,9 @@ public class ApiController {
         try {
             String disc = body.get("disciplina");
             String doc = body.get("docente");
+            if ((doc == null || doc.isBlank()) && disc != null && !disc.isBlank()) {
+                doc = disciplinaRepository.findByCodigo(disc.trim()).map(Disciplina::getDocente).orElse(doc);
+            }
             String amb = body.get("ambiente");
             String turma = body.getOrDefault("turma", "T1");
             String perStr = body.get("periodo") != null ? body.get("periodo") : body.get("periodoCurso");

@@ -98,7 +98,11 @@ public class CoordenadorCursoController {
             Time horario_inicio = Time.valueOf(map.get("horarioInicio"));
             Time horario_fim = Time.valueOf(map.get("horarioFim"));
 
-            coordenadorCursoService.alocarRecurso(disciplina, matricula, ambiente, turma, periodo, horario_inicio, horario_fim);
+            if (map.containsKey("diaSemana") && map.get("diaSemana") != null && !map.get("diaSemana").isBlank()) {
+                coordenadorCursoService.alocarRecurso(disciplina, matricula, ambiente, turma, periodo, map.get("diaSemana"), horario_inicio, horario_fim);
+            } else {
+                coordenadorCursoService.alocarRecurso(disciplina, matricula, ambiente, turma, periodo, horario_inicio, horario_fim);
+            }
             return ResponseEntity.ok("Recursos alocodaos no horário");
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());

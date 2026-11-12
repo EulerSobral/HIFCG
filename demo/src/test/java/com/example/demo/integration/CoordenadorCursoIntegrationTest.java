@@ -197,5 +197,28 @@ class CoordenadorCursoIntegrationTest {
         mockMvc.perform(get("/api/alocacoes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].DISCIPLINA", hasItem("MAT101")));
+
+        // Tentar alocar outra disciplina no mesmo horário com o mesmo professor (choque de professor)
+        Map<String, String> choqueDocenteData = Map.of(
+                "codigoDisciplina", "PRG101",
+                "codigoMatricula", "1001",
+                "codigoAmbiente", "LAB-01",
+                "codigoTurma", "T2",
+                "codigoPeriodo", "2",
+                "horarioInicio", "07:30:00",
+                "horarioFim", "09:10:00"
+        );
+
+        mockMvc.perform(post("/CoordenadorCurso/alocarRecurso")
+                        .header("Authorization", "Bearer token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(choqueDocenteData)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("Choque de horário detectado para o Docente")));
+
+        // Garante que a alocação com conflito NÃO foi efetivada/salva
+        mockMvc.perform(get("/api/alocacoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].DISCIPLINA", not(hasItem("PRG101"))));
     }
 }

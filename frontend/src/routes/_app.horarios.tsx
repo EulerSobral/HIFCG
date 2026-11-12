@@ -192,7 +192,7 @@ function Page() {
       discObj?.docenteId ?? existing?.docenteId ?? prevAlocDisc?.docenteId ?? s.docentes[0]?.id ?? "",
     );
     setAmbienteId(
-      existing?.ambienteId ?? prevAlocDisc?.ambienteId ?? ambientePadraoId ?? s.ambientes[0]?.id ?? "",
+      existing?.ambienteId ?? ambientePadraoId ?? prevAlocDisc?.ambienteId ?? s.ambientes[0]?.id ?? "",
     );
   };
 
@@ -217,34 +217,24 @@ function Page() {
       return;
     }
 
-    const limite = Math.max(1, Number(disc.aulasSemanais) || Math.round((disc.cargaHoraria || 60) / 20));
-    const jaAlocadas = alocacoesDoPeriodoLetivo.filter(
-      (a) =>
-        a.disciplinaId === disc.id &&
-        a.cursoId === cursoId &&
-        a.periodoCurso === periodoCurso &&
-        a.id !== moveAlocId,
-    );
-    const existingInCell = alocacoesGrid[`${dia}-${horario}`];
-    if (existingInCell?.disciplinaId !== disc.id && jaAlocadas.length >= limite) {
-      toast.warning(`Todas as ${limite} aulas semanais de "${disc.nome}" já estão alocadas neste período.`);
-      setSelectedBloco(null);
-      return;
-    }
+    const existingMoveAloc = moveAlocId
+      ? alocacoesDoPeriodoLetivo.find((a) => a.id === moveAlocId)
+      : undefined;
 
     const ambFinal =
-      existingInCell?.ambienteId || prevAlocDisc?.ambienteId || ambientePadraoId || s.ambientes[0]?.id || "";
+      ambientePadraoId ||
+      existingMoveAloc?.ambienteId ||
+      prevAlocDisc?.ambienteId ||
+      s.ambientes[0]?.id ||
+      "";
     if (!ambFinal) {
       openSlot(dia, horario, disc.id, moveAlocId);
       return;
     }
 
-    if (moveAlocId && existingInCell && existingInCell.id !== moveAlocId) {
-      s.removeAlocacao(moveAlocId);
-    }
-
-    const conflictId = s.setAlocacao({
-      id: moveAlocId ?? existingInCell?.id ?? undefined,
+    // Verifica primeiramente se há choque de horário (professor, espaço/ambiente ou turma)
+    const conflictMsg = s.verificarConflitoAlocacao({
+      id: moveAlocId ?? undefined,
       disciplinaId: disc.id,
       docenteId: docDefinido,
       ambienteId: ambFinal,
@@ -255,12 +245,44 @@ function Page() {
       horario,
     });
 
-    const slotCode = SLOTS_HORARIOS.find((sl) => sl.horario === horario)?.code ?? horario;
-    if (conflictId) {
-      toast.warning(`Horário alocado para "${disc.nome}" em ${DIAS[dia]} (${slotCode}), mas há choque de horário!`);
-    } else {
-      toast.success(`"${disc.nome}" alocada em ${DIAS[dia]} · ${slotCode} (${ periodoLetivoAtivo })`);
+    if (conflictMsg) {
+      toast.error(conflictMsg);
+      return;
     }
+
+    const limite = Math.max(1, Number(disc.aulasSemanais) || Math.round((disc.cargaHoraria || 60) / 20));
+    const jaAlocadas = alocacoesDoPeriodoLetivo.filter(
+      (a) =>
+        a.disciplinaId === disc.id &&
+        a.cursoId === cursoId &&
+        a.periodoCurso === periodoCurso &&
+        a.id !== moveAlocId,
+    );
+    if (jaAlocadas.length >= limite) {
+      toast.warning(`Todas as ${limite} aulas semanais de "${disc.nome}" já estão alocadas neste período.`);
+      setSelectedBloco(null);
+      return;
+    }
+
+    const erroAlocacao = s.setAlocacao({
+      id: moveAlocId ?? undefined,
+      disciplinaId: disc.id,
+      docenteId: docDefinido,
+      ambienteId: ambFinal,
+      cursoId,
+      periodoCurso,
+      periodoLetivo: periodoLetivoAtivo,
+      dia,
+      horario,
+    });
+
+    if (erroAlocacao) {
+      toast.error(erroAlocacao);
+      return;
+    }
+
+    const slotCode = SLOTS_HORARIOS.find((sl) => sl.horario === horario)?.code ?? horario;
+    toast.success(`"${disc.nome}" alocada em ${DIAS[dia]} · ${slotCode} (${periodoLetivoAtivo})`);
     setSelectedBloco(null);
   };
 
@@ -272,18 +294,61 @@ function Page() {
     openSlot(dia, horario);
   };
 
+  const conflitoModal = useMemo(() => {
+    if (!slot || !disciplinaId || !docenteId || !ambienteId) return null;
+    return s.verificarConflitoAlocacao({
+      id: editId ?? undefined,
+      disciplinaId,
+      docenteId,
+      ambienteId,
+      cursoId,
+      periodoCurso,
+      periodoLetivo: periodoLetivoAtivo,
+      dia: slot.dia,
+      horario: slot.horario,
+    });
+  }, [
+    s.alocacoes,
+    s.disciplinas,
+    s.docentes,
+    s.ambientes,
+    s.cursos,
+    slot,
+    editId,
+    disciplinaId,
+    docenteId,
+    ambienteId,
+    cursoId,
+    periodoCurso,
+    periodoLetivoAtivo,
+  ]);
+
   const save = () => {
     if (!slot || !disciplinaId || !docenteId || !ambienteId) {
       toast.error("Preencha todos os campos");
       return;
     }
 
+    // Verifica se há choque de professor, de espaço/ambiente ou de turma antes de efetivar a alocação
+    const conflictMsg = s.verificarConflitoAlocacao({
+      id: editId ?? undefined,
+      disciplinaId,
+      docenteId,
+      ambienteId,
+      cursoId,
+      periodoCurso,
+      periodoLetivo: periodoLetivoAtivo,
+      dia: slot.dia,
+      horario: slot.horario,
+    });
+
+    if (conflictMsg) {
+      toast.error(conflictMsg);
+      return;
+    }
+
     const disc = s.disciplinas.find((d) => d.id === disciplinaId);
     if (disc) {
-      // Se a disciplina ainda não tinha professor vinculado ou mudou, atualiza o vínculo professor -> disciplina
-      if (disc.docenteId !== docenteId) {
-        s.updateDisciplina(disc.id, { docenteId });
-      }
       const limite = Math.max(1, Number(disc.aulasSemanais) || Math.round((disc.cargaHoraria || 60) / 20));
       const jaAlocadas = alocacoesDoPeriodoLetivo.filter(
         (a) =>
@@ -296,9 +361,18 @@ function Page() {
         toast.warning(`A disciplina "${disc.nome}" já atingiu o limite de ${limite} aula(s) semanal(is).`);
         return;
       }
+
+      // Se a disciplina ainda não tinha professor vinculado ou mudou, atualiza o vínculo professor -> disciplina
+      if (disc.docenteId !== docenteId) {
+        const resUpdate = s.updateDisciplina(disc.id, { docenteId });
+        if (!resUpdate.ok) {
+          toast.error(resUpdate.error || "Não foi possível vincular o professor devido a choque de horário.");
+          return;
+        }
+      }
     }
 
-    const conflictId = s.setAlocacao({
+    const erroAlocacao = s.setAlocacao({
       id: editId ?? undefined,
       disciplinaId,
       docenteId,
@@ -309,8 +383,12 @@ function Page() {
       dia: slot.dia,
       horario: slot.horario,
     });
-    if (conflictId) toast.warning("Atenção: choque de horário detectado!");
-    else toast.success(`Alocação salva no período ${periodoLetivoAtivo}`);
+    if (erroAlocacao) {
+      toast.error(erroAlocacao);
+      return;
+    }
+
+    toast.success(`Alocação salva no período ${periodoLetivoAtivo}`);
     setSlot(null);
     setEditId(null);
   };
@@ -598,7 +676,11 @@ function Page() {
                       <Select
                         value={docenteVinculadoId || ""}
                         onValueChange={(novoDocId) => {
-                          s.updateDisciplina(d.id, { docenteId: novoDocId });
+                          const res = s.updateDisciplina(d.id, { docenteId: novoDocId });
+                          if (!res.ok) {
+                            toast.error(res.error || "Não foi possível vincular o professor devido a choque de horário.");
+                            return;
+                          }
                           const docNome = s.docentes.find((x) => x.id === novoDocId)?.nome;
                           toast.success(`Professor ${docNome} vinculado a "${d.nome}"`);
                         }}
@@ -754,6 +836,12 @@ function Page() {
                 placeholder="Buscar ambiente…"
               />
             </div>
+            {conflitoModal && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{conflitoModal}</span>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
             {editId && (
@@ -761,7 +849,7 @@ function Page() {
                 <Trash2 className="h-4 w-4 mr-2" /> Remover
               </Button>
             )}
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={save}>{editId ? "Salvar" : "Alocar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

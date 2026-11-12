@@ -304,6 +304,11 @@ class DiretorECoordenadorAreaIntegrationTest {
                         .content(objectMapper.writeValueAsString(choqueData)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("Choque de horário")));
+
+        // 4. Garantir que a alocação com conflito de ambiente NÃO foi salva
+        mockMvc.perform(get("/api/alocacoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].DISCIPLINA", not(hasItem("MAT101"))));
     }
 
     // =========================================================================

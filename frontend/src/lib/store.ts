@@ -274,6 +274,9 @@ interface State {
   }) => Promise<{ ok: boolean; error?: string }>;
   removeUser: (id: string) => void;
 
+  verificarConflitoAlocacao: (
+    a: Omit<Alocacao, "id" | "periodoLetivo"> & { id?: string; periodoLetivo?: string },
+  ) => string | null;
   setAlocacao: (a: Omit<Alocacao, "id" | "periodoLetivo"> & { id?: string; periodoLetivo?: string }) => string | null;
   removeAlocacao: (id: string) => void;
 }
@@ -328,6 +331,93 @@ const toBackendHorario = (horario: string): { inicio: string; fim: string } => {
   const fmt = (t: string) => (t.trim().length === 5 ? `${t.trim()}:00` : t.trim());
   return { inicio: fmt(ini), fim: fmt(fim) };
 };
+
+const parseMinutes = (hhmm: string): number | null => {
+  const parts = hhmm.trim().split(":");
+  if (parts.length < 2) return null;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+};
+
+/** Verifica se dois intervalos de horário (ex.: "07:00-07:50") coincidem ou se sobrepõem. */
+export const horariosConflitam = (h1: string, h2: string): boolean => {
+  const a = (h1 || "").trim();
+  const b = (h2 || "").trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [iniA, fimA] = a.split("-");
+  const [iniB, fimB] = b.split("-");
+  if (!iniA || !fimA || !iniB || !fimB) return a === b;
+  const startA = parseMinutes(iniA);
+  const endA = parseMinutes(fimA);
+  const startB = parseMinutes(iniB);
+  const endB = parseMinutes(fimB);
+  if (startA === null || endA === null || startB === null || endB === null) return a === b;
+  return startA < endB && endA > startB;
+};
+
+/** Remove alocações conflitantes (choque de professor, de espaço/ambiente ou de turma) para garantir integridade do estado. */
+function removerAlocacoesComConflito(
+  alocacoes: Alocacao[],
+  ctx?: {
+    disciplinas?: Disciplina[];
+    docentes?: Docente[];
+    ambientes?: Ambiente[];
+    cursos?: Curso[];
+  },
+): Alocacao[] {
+  const normDocente = (val?: string, discId?: string) => {
+    const disc = ctx?.disciplinas?.find((d) => d.id === discId || d.codigo === discId);
+    const raw = val || disc?.docenteId || "";
+    if (!raw) return "";
+    const found = ctx?.docentes?.find((d) => d.id === raw || d.matricula === raw);
+    return found ? found.id : raw.trim();
+  };
+  const normAmbiente = (val?: string) => {
+    if (!val) return "";
+    const found = ctx?.ambientes?.find((am) => am.id === val || am.codigo === val);
+    return found ? found.id : val.trim();
+  };
+  const normCurso = (val?: string) => {
+    if (!val) return "";
+    const found = ctx?.cursos?.find((c) => c.id === val || c.codigo === val);
+    return found ? found.id : val.trim();
+  };
+
+  const validas: Alocacao[] = [];
+  for (const a of alocacoes) {
+    const perLetivo = (a.periodoLetivo || "2026.1").trim();
+    const docA = normDocente(a.docenteId, a.disciplinaId);
+    const ambA = normAmbiente(a.ambienteId);
+    const curA = normCurso(a.cursoId);
+    const perCursoA = Number(a.periodoCurso) || 1;
+    const diaA = Number(a.dia);
+
+    const temConflito = validas.some((x) => {
+      if (x.id === a.id) return false;
+      if ((x.periodoLetivo || "2026.1").trim() !== perLetivo) return false;
+      if (Number(x.dia) !== diaA) return false;
+      if (!horariosConflitam(x.horario, a.horario)) return false;
+
+      const docX = normDocente(x.docenteId, x.disciplinaId);
+      const ambX = normAmbiente(x.ambienteId);
+      const curX = normCurso(x.cursoId);
+      const perCursoX = Number(x.periodoCurso) || 1;
+
+      return (
+        (Boolean(docA) && docX === docA) ||
+        (Boolean(ambA) && ambX === ambA) ||
+        (Boolean(curA) && curX === curA && perCursoX === perCursoA)
+      );
+    });
+    if (!temConflito) {
+      validas.push(a);
+    }
+  }
+  return validas;
+}
 
 const seedUsers: User[] = [
   { id: "u1", nome: "Dr. Roberto Lima", email: "diretor@ifpb.edu.br", salt: "s1", senhaHash: "2bb2196139a152d838a22cc4e4b8fc3b425ad36bed7e5576821fdbd558f12103", role: "diretor" },
@@ -596,27 +686,45 @@ export const useStore = create<State>()(
 
           const nextAlocacoes: Alocacao[] = Array.isArray(dbAlocacoes)
             ? dbAlocacoes.map((a: any) => {
-                const disc = nextDisciplinas.find((d) => d.codigo === a.disciplina || d.id === a.disciplina);
-                const doc = nextDocentes.find((d) => d.matricula === a.docente || d.id === a.docente);
-                const amb = nextAmbientes.find((am) => am.codigo === a.ambiente || am.id === a.ambiente);
-                const cur = nextCursos.find((c) => c.codigo === a.turma || c.id === a.turma);
-                const diaIdx = DIA_CODES.indexOf(String(a.dia_semana || "SEG").toUpperCase());
-                const hIni = String(a.horario_inicio || "08:00").slice(0, 5);
-                const hFim = String(a.horario_fim || "09:40").slice(0, 5);
-                const perLetivo = String(a.periodo_letivo || a.periodoLetivo || periodoAtivoNome);
+                const rawDisc = a.disciplina ?? a.DISCIPLINA;
+                const rawDoc = a.docente ?? a.DOCENTE;
+                const rawAmb = a.ambiente ?? a.AMBIENTE;
+                const rawTurma = a.turma ?? a.TURMA;
+                const rawPeriodo = a.periodo ?? a.PERIODO;
+                const rawDia = a.dia_semana ?? a.DIA_SEMANA ?? a.diaSemana;
+                const rawIni = a.horario_inicio ?? a.HORARIO_INICIO ?? a.horarioInicio;
+                const rawFim = a.horario_fim ?? a.HORARIO_FIM ?? a.horarioFim;
+                const rawPerLetivo = a.periodo_letivo ?? a.PERIODO_LETIVO ?? a.periodoLetivo;
+                const rawId = a.id ?? a.ID ?? uid();
+
+                const disc = nextDisciplinas.find((d) => d.codigo === rawDisc || d.id === rawDisc);
+                const doc = nextDocentes.find((d) => d.matricula === rawDoc || d.id === rawDoc);
+                const amb = nextAmbientes.find((am) => am.codigo === rawAmb || am.id === rawAmb);
+                const cur = nextCursos.find((c) => c.codigo === rawTurma || c.id === rawTurma);
+                const diaIdx = DIA_CODES.indexOf(String(rawDia || "SEG").toUpperCase());
+                const hIni = String(rawIni || "08:00").slice(0, 5);
+                const hFim = String(rawFim || "09:40").slice(0, 5);
+                const perLetivo = String(rawPerLetivo || periodoAtivoNome);
                 return {
-                  id: String(a.id),
-                  disciplinaId: disc?.id || a.disciplina,
-                  docenteId: doc?.id || disc?.docenteId || a.docente,
-                  ambienteId: amb?.id || a.ambiente,
-                  cursoId: cur?.id || a.turma,
-                  periodoCurso: Number(a.periodo) || 1,
+                  id: String(rawId),
+                  disciplinaId: disc?.id || rawDisc,
+                  docenteId: doc?.id || disc?.docenteId || rawDoc,
+                  ambienteId: amb?.id || rawAmb,
+                  cursoId: cur?.id || rawTurma,
+                  periodoCurso: Number(rawPeriodo) || 1,
                   periodoLetivo: perLetivo,
                   dia: diaIdx >= 0 ? diaIdx : 0,
                   horario: `${hIni}-${hFim}`,
                 };
               })
             : current.alocacoes;
+
+          const alocacoesValidas = removerAlocacoesComConflito(nextAlocacoes, {
+            disciplinas: nextDisciplinas,
+            docentes: nextDocentes,
+            ambientes: nextAmbientes,
+            cursos: nextCursos,
+          });
 
           const nextLogs: LogEntry[] = Array.isArray(dbLogs) && dbLogs.length > 0
             ? dbLogs.map((l: any) => {
@@ -638,7 +746,7 @@ export const useStore = create<State>()(
             ambientes: nextAmbientes,
             disciplinas: nextDisciplinas,
             periodos: nextPeriodos,
-            alocacoes: nextAlocacoes,
+            alocacoes: alocacoesValidas,
             logs: nextLogs,
           });
         } catch (err) {
@@ -780,6 +888,33 @@ export const useStore = create<State>()(
         const nomeFinal = d.nome ?? atual.nome;
         const codigoFinal =
           novoCodigo || gerarCodigoDisciplina(nomeFinal, cursoCodigo, periodoFinal, existentes, id);
+
+        if (d.docenteId && d.docenteId !== atual.docenteId) {
+          const alocsDaDisciplina = get().alocacoes.filter((aloc) => aloc.disciplinaId === id);
+          for (const aloc of alocsDaDisciplina) {
+            const perLetivo = aloc.periodoLetivo || "2026.1";
+            const conflitoDoc = get().alocacoes.find(
+              (x) =>
+                x.disciplinaId !== id &&
+                (x.periodoLetivo || "2026.1") === perLetivo &&
+                x.dia === aloc.dia &&
+                x.horario === aloc.horario &&
+                x.docenteId === d.docenteId,
+            );
+            if (conflitoDoc) {
+              const docNome = get().docentes.find((doc) => doc.id === d.docenteId)?.nome || "Professor";
+              const discConflito =
+                get().disciplinas.find((disc) => disc.id === conflitoDoc.disciplinaId)?.nome || "outra disciplina";
+              const diaNome = DIAS[aloc.dia] || "Dia";
+              const slotObj = SLOTS_HORARIOS.find((s) => s.horario === aloc.horario);
+              const horarioLabel = slotObj ? `${slotObj.code} (${aloc.horario})` : aloc.horario;
+              return {
+                ok: false,
+                error: `Choque de horário de professor: ${docNome} já está alocado(a) em ${diaNome} · ${horarioLabel} na disciplina "${discConflito}". A alteração não foi realizada.`,
+              };
+            }
+          }
+        }
 
         set((s) => ({
           disciplinas: s.disciplinas.map((x) =>
@@ -1023,6 +1158,98 @@ export const useStore = create<State>()(
         get().addLog("usuario.remover", id);
       },
 
+      verificarConflitoAlocacao: (a) => {
+        const id = a.id;
+        const state = get();
+        const periodoAtivo = state.periodos.find((p) => p.ativo)?.nome || "2026.1";
+        const periodoLetivo = (a.periodoLetivo || periodoAtivo).trim();
+        const discObj = state.disciplinas.find((d) => d.id === a.disciplinaId || d.codigo === a.disciplinaId);
+        const rawDocenteId = a.docenteId || discObj?.docenteId || "";
+
+        const normDocente = (val?: string) => {
+          if (!val) return "";
+          const found = state.docentes.find((d) => d.id === val || d.matricula === val);
+          return found ? found.id : val.trim();
+        };
+        const normAmbiente = (val?: string) => {
+          if (!val) return "";
+          const found = state.ambientes.find((am) => am.id === val || am.codigo === val);
+          return found ? found.id : val.trim();
+        };
+        const normCurso = (val?: string) => {
+          if (!val) return "";
+          const found = state.cursos.find((c) => c.id === val || c.codigo === val);
+          return found ? found.id : val.trim();
+        };
+
+        const targetDocenteKey = normDocente(rawDocenteId);
+        const targetAmbienteKey = normAmbiente(a.ambienteId);
+        const targetCursoKey = normCurso(a.cursoId);
+        const targetPeriodoCurso = Number(a.periodoCurso) || 1;
+        const targetDia = Number(a.dia);
+
+        const noMesmoHorario = state.alocacoes.filter(
+          (x) =>
+            x.id !== id &&
+            (x.periodoLetivo || "2026.1").trim() === periodoLetivo &&
+            Number(x.dia) === targetDia &&
+            horariosConflitam(x.horario, a.horario),
+        );
+
+        const getEffectiveDocenteKey = (x: Alocacao) => {
+          const d = state.disciplinas.find((item) => item.id === x.disciplinaId || item.codigo === x.disciplinaId);
+          return normDocente(x.docenteId || d?.docenteId);
+        };
+
+        const choqueDocente = targetDocenteKey
+          ? noMesmoHorario.find((x) => getEffectiveDocenteKey(x) === targetDocenteKey)
+          : undefined;
+        const choqueAmbiente = targetAmbienteKey
+          ? noMesmoHorario.find((x) => normAmbiente(x.ambienteId) === targetAmbienteKey)
+          : undefined;
+        const choqueTurma = noMesmoHorario.find(
+          (x) => normCurso(x.cursoId) === targetCursoKey && (Number(x.periodoCurso) || 1) === targetPeriodoCurso,
+        );
+
+        if (!choqueDocente && !choqueAmbiente && !choqueTurma) {
+          return null;
+        }
+
+        const diaNome = DIAS[targetDia] || "Dia";
+        const slotObj = SLOTS_HORARIOS.find((s) => s.horario === a.horario);
+        const horarioLabel = slotObj ? `${slotObj.code} (${a.horario})` : a.horario;
+
+        const descreverAlocacao = (x: Alocacao) => {
+          const d = state.disciplinas.find((item) => item.id === x.disciplinaId || item.codigo === x.disciplinaId);
+          const c = state.cursos.find((item) => item.id === x.cursoId || item.codigo === x.cursoId);
+          const discLabel = d?.nome || d?.codigo || "outra disciplina";
+          const cursoLabel = c ? ` · ${c.codigo} (${x.periodoCurso}º período)` : "";
+          return `"${discLabel}"${cursoLabel}`;
+        };
+
+        if (choqueDocente && choqueAmbiente) {
+          const docNome = state.docentes.find((d) => d.id === targetDocenteKey)?.nome || "Professor";
+          const ambCodigo = state.ambientes.find((am) => am.id === targetAmbienteKey)?.codigo || "Ambiente";
+          return `Choque de horário (professor e espaço) em ${diaNome} · ${horarioLabel}: o(a) professor(a) ${docNome} já está alocado(a) em ${descreverAlocacao(choqueDocente)} e o ambiente ${ambCodigo} já está ocupado por ${descreverAlocacao(choqueAmbiente)}. A alocação não foi efetivada.`;
+        }
+
+        if (choqueDocente) {
+          const docNome = state.docentes.find((d) => d.id === targetDocenteKey)?.nome || "Professor";
+          return `Choque de horário de professor em ${diaNome} · ${horarioLabel}: ${docNome} já está alocado(a) em ${descreverAlocacao(choqueDocente)}. A alocação não foi efetivada.`;
+        }
+
+        if (choqueAmbiente) {
+          const ambCodigo = state.ambientes.find((am) => am.id === targetAmbienteKey)?.codigo || "Ambiente";
+          return `Choque de horário de espaço em ${diaNome} · ${horarioLabel}: o ambiente ${ambCodigo} já está ocupado por ${descreverAlocacao(choqueAmbiente)}. A alocação não foi efetivada.`;
+        }
+
+        if (choqueTurma) {
+          return `Choque de horário na turma em ${diaNome} · ${horarioLabel}: este horário já está ocupado por ${descreverAlocacao(choqueTurma)}. A alocação não foi efetivada.`;
+        }
+
+        return "Choque de horário detectado. A alocação não foi efetivada.";
+      },
+
       setAlocacao: (a) => {
         const id = a.id ?? uid();
         const periodoAtivo = get().periodos.find((p) => p.ativo)?.nome || "2026.1";
@@ -1030,16 +1257,20 @@ export const useStore = create<State>()(
         const discObj = get().disciplinas.find((d) => d.id === a.disciplinaId);
         const docenteIdFinal = a.docenteId || discObj?.docenteId || "";
 
-        const conflict = get().alocacoes.find(
-          (x) =>
-            x.id !== id &&
-            (x.periodoLetivo || "2026.1") === periodoLetivo &&
-            x.dia === a.dia &&
-            x.horario === a.horario &&
-            (x.docenteId === docenteIdFinal ||
-              x.ambienteId === a.ambienteId ||
-              (x.cursoId === a.cursoId && x.periodoCurso === a.periodoCurso)),
-        );
+        const conflitoMsg = get().verificarConflitoAlocacao({
+          ...a,
+          id,
+          docenteId: docenteIdFinal,
+          periodoLetivo,
+        });
+
+        // Se houver choque de horário (professor, espaço ou turma), NÃO efetiva nem salva a alocação
+        if (conflitoMsg) {
+          return conflitoMsg;
+        }
+
+        const prevAloc = get().alocacoes.find((x) => x.id === id);
+
         set((s) => {
           const exists = s.alocacoes.some((x) => x.id === id);
           const next: Alocacao = { ...a, docenteId: docenteIdFinal, periodoLetivo, id };
@@ -1047,6 +1278,25 @@ export const useStore = create<State>()(
             alocacoes: exists ? s.alocacoes.map((x) => (x.id === id ? next : x)) : [...s.alocacoes, next],
           };
         });
+
+        if (prevAloc) {
+          const prevDisc = get().disciplinas.find((d) => d.id === prevAloc.disciplinaId)?.codigo || prevAloc.disciplinaId;
+          const prevDoc = get().docentes.find((d) => d.id === prevAloc.docenteId)?.matricula || prevAloc.docenteId;
+          const prevAmb = get().ambientes.find((am) => am.id === prevAloc.ambienteId)?.codigo || prevAloc.ambienteId;
+          const prevCurso = get().cursos.find((c) => c.id === prevAloc.cursoId)?.codigo || prevAloc.cursoId;
+          const prevHor = toBackendHorario(prevAloc.horario);
+          removeAlocacaoApi({
+            disciplina: prevDisc,
+            docente: prevDoc,
+            ambiente: prevAmb,
+            turma: prevCurso,
+            periodo: prevAloc.periodoCurso,
+            periodoLetivo: prevAloc.periodoLetivo,
+            diaSemana: DIA_CODES[prevAloc.dia] || "SEG",
+            horarioInicio: prevHor.inicio,
+            horarioFim: prevHor.fim,
+          });
+        }
 
         const disc = discObj?.codigo || a.disciplinaId;
         const doc = get().docentes.find((d) => d.id === docenteIdFinal)?.matricula || docenteIdFinal;
@@ -1067,7 +1317,7 @@ export const useStore = create<State>()(
         });
 
         get().addLog("alocacao.salvar", `${periodoLetivo} · ${a.dia}/${a.horario}`);
-        return conflict ? conflict.id : null;
+        return null;
       },
       removeAlocacao: (id) => {
         const target = get().alocacoes.find((x) => x.id === id);
@@ -1096,7 +1346,20 @@ export const useStore = create<State>()(
     }),
     {
       name: "hifcg-store-v7",
-      version: 9,
+      version: 12,
+      onRehydrateStorage: () => (state) => {
+        if (state && Array.isArray(state.alocacoes)) {
+          const limpas = removerAlocacoesComConflito(state.alocacoes, {
+            disciplinas: state.disciplinas,
+            docentes: state.docentes,
+            ambientes: state.ambientes,
+            cursos: state.cursos,
+          });
+          if (limpas.length !== state.alocacoes.length) {
+            state.alocacoes = limpas;
+          }
+        }
+      },
       migrate: (persisted) => {
         const s = persisted as Partial<State> | undefined;
         const cursos = (s?.cursos ?? seedCursos).map((c) => ({ ...c, periodos: c.periodos ?? 6 }));
@@ -1136,11 +1399,19 @@ export const useStore = create<State>()(
           });
         }
 
-        const alocacoes = (s?.alocacoes ?? []).map((a) => ({
-          ...a,
-          periodoCurso: (a as any).periodoCurso ?? 1,
-          periodoLetivo: (a as any).periodoLetivo || defaultPeriodoLetivo,
-        }));
+        const alocacoes = removerAlocacoesComConflito(
+          (s?.alocacoes ?? []).map((a) => ({
+            ...a,
+            periodoCurso: (a as any).periodoCurso ?? 1,
+            periodoLetivo: (a as any).periodoLetivo || defaultPeriodoLetivo,
+          })),
+          {
+            disciplinas: disciplinasMigradas,
+            docentes: s?.docentes ?? seedDocentes,
+            ambientes: s?.ambientes ?? seedAmbientes,
+            cursos,
+          },
+        );
 
         return {
           ...(s ?? {}),
